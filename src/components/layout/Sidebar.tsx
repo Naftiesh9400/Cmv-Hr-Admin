@@ -47,6 +47,7 @@ export function Sidebar({ isAdmin = false }: SidebarProps) {
     { icon: Clock, label: "Attendance", path: "/admin/attendance" },
     { icon: Calendar, label: "Leave Requests", path: "/admin/leave" },
     { icon: IndianRupee, label: "Payroll", path: "/admin/payroll" },
+    { icon: FileText, label: "Documents", path: "/admin/documents" },
     { icon: TrendingUp, label: "Increments", path: "/admin/increments" },
     { icon: Building2, label: "Organization", path: "/admin/organization" },
     { icon: Shield, label: "Roles & Access", path: "/admin/roles" },

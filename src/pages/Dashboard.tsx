@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { StatCard } from "@/components/dashboard/StatCard";
@@ -13,13 +13,38 @@ import {
   TrendingUp,
   CheckCircle,
   AlertTriangle,
+  Pencil,
 } from "lucide-react";
+import { getFirestore, doc, onSnapshot } from "firebase/firestore";
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const db = getFirestore();
   const displayName = user?.displayName || user?.email?.split('@')[0] || "User";
   const [todayHours, setTodayHours] = useState("0h 0m");
   const hoursWorked = parseInt(todayHours.split("h")[0]) || 0;
+  const [stats, setStats] = useState({
+    leaveBalance: { casual: 0, sick: 0 },
+    currentSalary: 0,
+    performance: { score: 0, trend: 0 }
+  });
+
+  useEffect(() => {
+    if (!user) return;
+    const unsubscribe = onSnapshot(doc(db, "users", user.uid), (doc) => {
+      if (doc.exists()) {
+        const data = doc.data();
+        setStats({
+          leaveBalance: data.leaveBalance || { casual: 0, sick: 0 },
+          currentSalary: data.currentSalary || 0,
+          performance: data.performance || { score: 0, trend: 0 }
+        });
+      }
+    });
+    return () => unsubscribe();
+  }, [user, db]);
+
+  const totalLeave = (stats.leaveBalance.casual || 0) + (stats.leaveBalance.sick || 0);
 
   return (
     <DashboardLayout>
@@ -51,22 +76,22 @@ export default function Dashboard() {
           />
           <StatCard
             title="Leave Balance"
-            value="12 days"
-            subtitle="Casual: 8, Sick: 4"
+            value={`${totalLeave} days`}
+            subtitle={`Casual: ${stats.leaveBalance.casual}, Sick: ${stats.leaveBalance.sick}`}
             icon={Calendar}
             variant="accent"
           />
           <StatCard
             title="This Month"
-            value="₹4,250"
+            value={`₹${stats.currentSalary.toLocaleString()}`}
             subtitle="Net salary"
             icon={IndianRupee}
             variant="success"
           />
           <StatCard
             title="Performance"
-            value="92%"
-            trend={{ value: 5, isPositive: true }}
+            value={`${stats.performance.score}%`}
+            trend={{ value: stats.performance.trend, isPositive: stats.performance.trend >= 0 }}
             icon={TrendingUp}
             variant="warning"
           />

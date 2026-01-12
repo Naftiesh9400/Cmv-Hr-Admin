@@ -2,14 +2,16 @@ import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { getFirestore, collection, getDocs, query, orderBy, limit } from "firebase/firestore";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Clock, Calendar as CalendarIcon } from "lucide-react";
+import { Clock, Calendar as CalendarIcon, Search } from "lucide-react";
 import { format } from "date-fns";
 
 export default function AdminAttendance() {
   const db = getFirestore();
   const [attendanceData, setAttendanceData] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     const fetchAllAttendance = async () => {
@@ -48,6 +50,11 @@ export default function AdminAttendance() {
     fetchAllAttendance();
   }, [db]);
 
+  const filteredData = attendanceData.filter(record =>
+    record.userId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    record.date?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <DashboardLayout isAdmin>
       <div className="space-y-6">
@@ -58,6 +65,18 @@ export default function AdminAttendance() {
           <p className="text-muted-foreground mt-1">
             Monitor employee check-ins and work hours
           </p>
+        </div>
+
+        <div className="flex items-center gap-4 bg-card p-4 rounded-xl border shadow-sm">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by User ID or Date (YYYY-MM-DD)..."
+              className="pl-9 bg-background"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
         </div>
 
         <div className="rounded-xl border bg-card shadow-card overflow-hidden">
@@ -73,7 +92,7 @@ export default function AdminAttendance() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {attendanceData.length > 0 ? attendanceData.map((record) => (
+              {filteredData.length > 0 ? filteredData.map((record) => (
                 <TableRow key={record.id} className="hover:bg-muted/30">
                   <TableCell>
                     <div className="flex items-center gap-3">

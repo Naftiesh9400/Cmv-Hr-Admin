@@ -1,26 +1,26 @@
 import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { getFirestore, collection, getDocs, query, orderBy, doc, updateDoc } from "firebase/firestore";
+import { getFirestore, collection, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, onSnapshot } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { CheckCircle, XCircle } from "lucide-react";
+import { CheckCircle, XCircle, Search } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AdminLeave() {
   const db = getFirestore();
   const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    fetchLeaveRequests();
-  }, []);
-
-  const fetchLeaveRequests = async () => {
     const q = query(collection(db, "leaves"), orderBy("createdAt", "desc"));
-    const snapshot = await getDocs(q);
-    setLeaveRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-  };
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setLeaveRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsubscribe();
+  }, [db]);
 
   const handleAction = async (id: string, action: 'approve' | 'reject') => {
     const request = leaveRequests.find(r => r.id === id);
@@ -31,12 +31,27 @@ export default function AdminLeave() {
         status: action === 'approve' ? 'Approved' : 'Rejected'
       });
 
+      // Notify Employee
+      await addDoc(collection(db, "notifications"), {
+        recipientId: request.userId,
+        title: `Leave Request ${action === 'approve' ? 'Approved' : 'Rejected'}`,
+        message: `Your leave request for ${request.type} has been ${action}d.`,
+        type: "leave",
+        read: false,
+        createdAt: serverTimestamp(),
+        link: "/leave"
+      });
+
       toast.success(`Leave request ${action}d successfully`);
-      fetchLeaveRequests();
     } catch (error) {
       toast.error("Failed to update status");
     }
   };
+
+  const filteredRequests = leaveRequests.filter(request =>
+    request.userName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    request.type?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <DashboardLayout isAdmin>
@@ -48,6 +63,18 @@ export default function AdminLeave() {
           <p className="text-muted-foreground mt-1">
             Review and manage employee leave applications
           </p>
+        </div>
+
+        <div className="flex items-center gap-4 bg-card p-4 rounded-xl border shadow-sm">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by employee name or leave type..."
+              className="pl-9 bg-background"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
         </div>
 
         <div className="rounded-xl border bg-card shadow-card overflow-hidden">
@@ -63,7 +90,7 @@ export default function AdminLeave() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {leaveRequests.map((request) => (
+              {filteredRequests.map((request) => (
                 <TableRow key={request.id} className="hover:bg-muted/30">
                   <TableCell>
                     <div className="flex items-center gap-3">

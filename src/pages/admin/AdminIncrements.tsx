@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { getFirestore, collection, getDocs, query, orderBy, doc, updateDoc } from "firebase/firestore";
+import { getFirestore, collection, getDocs, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, onSnapshot, runTransaction } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -13,26 +13,44 @@ export default function AdminIncrements() {
   const [incrementRequests, setIncrementRequests] = useState<any[]>([]);
 
   useEffect(() => {
-    fetchRequests();
-  }, []);
-
-  const fetchRequests = async () => {
     const q = query(collection(db, "increments"), orderBy("createdAt", "desc"));
-    const snapshot = await getDocs(q);
-    setIncrementRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-  };
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setIncrementRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsubscribe();
+  }, [db]);
 
   const handleAction = async (id: string, action: 'approve' | 'reject') => {
     const request = incrementRequests.find(r => r.id === id);
     if (!request) return;
 
     try {
-      await updateDoc(doc(db, "increments", id), {
-        status: action === 'approve' ? 'Approved' : 'Rejected'
+      await runTransaction(db, async (transaction) => {
+        const incrementRef = doc(db, "increments", id);
+        transaction.update(incrementRef, { status: action === 'approve' ? 'Approved' : 'Rejected' });
+
+        if (action === 'approve') {
+          const userRef = doc(db, "users", request.userId);
+          // Assuming expectedAmount is a number or can be parsed to one
+          const newSalary = parseFloat(request.expectedAmount.replace(/[^0-9.-]+/g,""));
+          if (!isNaN(newSalary)) {
+            transaction.update(userRef, { currentSalary: newSalary });
+          }
+        }
       });
 
-      toast.success(`Increment request ${action}d`);
-      fetchRequests();
+      // Notify Employee
+      await addDoc(collection(db, "notifications"), {
+        recipientId: request.userId,
+        title: `Increment Request ${action === 'approve' ? 'Approved' : 'Rejected'}`,
+        message: `Your increment request has been ${action}d.`,
+        type: "increment",
+        read: false,
+        createdAt: serverTimestamp(),
+        link: "/increment"
+      });
+
+      toast.success(`Increment request ${action}d successfully`);
     } catch (error) {
       toast.error("Failed to update status");
     }
@@ -82,10 +100,14 @@ export default function AdminIncrements() {
                   <TableCell>₹{Number(req.currentSalary || 0).toLocaleString()}</TableCell>
                   <TableCell className="font-bold text-primary">{req.expectedAmount}</TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-1 text-success">
-                      <TrendingUp className="w-3 h-3" />
-                      {req.percentage}%
-                    </div>
+                    {req.currentSalary > 0 && (
+                      <div className="flex items-center gap-1 text-success">
+                        <TrendingUp className="w-3 h-3" />
+                        {(
+                          ((parseFloat(req.expectedAmount.replace(/[^0-9.-]+/g,"")) - req.currentSalary) / req.currentSalary) * 100
+                        ).toFixed(1)}%
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell className="max-w-[200px] truncate" title={req.reason}>{req.reason}</TableCell>
                   <TableCell>

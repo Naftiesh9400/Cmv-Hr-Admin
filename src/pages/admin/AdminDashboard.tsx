@@ -1,9 +1,11 @@
+import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { StatCard } from "@/components/dashboard/StatCard";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
+import { Input } from "@/components/ui/input";
 import {
   Users,
   Clock,
@@ -16,52 +18,195 @@ import {
   UserPlus,
   Download,
 } from "lucide-react";
-
-const pendingApprovals = [
-  {
-    id: 1,
-    type: "leave",
-    employee: "Sarah Johnson",
-    avatar: "",
-    initials: "SJ",
-    request: "Casual Leave - Jan 20-21",
-    submittedAt: "2 hours ago",
-  },
-  {
-    id: 2,
-    type: "increment",
-    employee: "Mike Chen",
-    avatar: "",
-    initials: "MC",
-    request: "Salary Increment Request",
-    submittedAt: "1 day ago",
-  },
-  {
-    id: 3,
-    type: "leave",
-    employee: "Emily Davis",
-    avatar: "",
-    initials: "ED",
-    request: "Work from Home - Jan 25-26",
-    submittedAt: "3 hours ago",
-  },
-];
-
-const todayAttendance = [
-  { name: "Present", count: 42, color: "bg-success" },
-  { name: "Late", count: 5, color: "bg-warning" },
-  { name: "Absent", count: 3, color: "bg-destructive" },
-  { name: "On Leave", count: 4, color: "bg-primary" },
-];
-
-const recentEmployees = [
-  { name: "Alex Turner", role: "Frontend Developer", status: "active", joinDate: "Jan 10, 2024" },
-  { name: "Jessica Lee", role: "HR Manager", status: "active", joinDate: "Jan 8, 2024" },
-  { name: "Robert Kim", role: "Data Analyst", status: "pending", joinDate: "Jan 12, 2024" },
-];
+import { getFirestore, collection, query, where, onSnapshot, orderBy, limit, doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
+import { format, formatDistanceToNow } from "date-fns";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 export default function AdminDashboard() {
   const { user } = useAuth();
+  const db = getFirestore();
+
+  const [stats, setStats] = useState({
+    totalEmployees: 0,
+    presentToday: 0,
+    pendingRequests: 0,
+    monthlyPayroll: 0
+  });
+
+  const [isAddEmployeeOpen, setIsAddEmployeeOpen] = useState(false);
+  const [newEmployee, setNewEmployee] = useState({
+    email: "",
+    password: "",
+    displayName: "",
+    role: "employee",
+  });
+
+  const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
+  const [todayAttendance, setTodayAttendance] = useState<any[]>([
+    { name: "Present", count: 0, color: "bg-success" },
+    { name: "Late", count: 0, color: "bg-warning" },
+    { name: "Absent", count: 0, color: "bg-destructive" },
+    { name: "On Leave", count: 0, color: "bg-primary" },
+  ]);
+  const [recentEmployees, setRecentEmployees] = useState<any[]>([]);
+  const [pendingLeaves, setPendingLeaves] = useState<any[]>([]);
+  const [pendingIncrements, setPendingIncrements] = useState<any[]>([]);
+
+  useEffect(() => {
+    // 1. Fetch Users Data (Total Employees, Payroll, Recent Employees)
+    const unsubscribeUsers = onSnapshot(collection(db, "users"), (snapshot) => {
+      const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      const total = users.length;
+      const payroll = users.reduce((sum, u: any) => sum + (Number(u.currentSalary) || 0), 0);
+      
+      setStats(prev => ({ ...prev, totalEmployees: total, monthlyPayroll: payroll }));
+      setRecentEmployees(users.slice(0, 5));
+    });
+
+    // 2. Fetch Today's Attendance
+    const today = new Date().toISOString().split('T')[0];
+    const attendanceQuery = query(collection(db, "attendance"), where("date", "==", today));
+    const unsubscribeAttendance = onSnapshot(attendanceQuery, (snapshot) => {
+      const records = snapshot.docs.map(doc => doc.data());
+      const present = records.filter((r: any) => r.status === 'present').length;
+      const late = records.filter((r: any) => r.status === 'late').length;
+      
+      setStats(prev => ({ ...prev, presentToday: present + late }));
+      
+      setTodayAttendance(prev => prev.map(item => {
+        if (item.name === "Present") return { ...item, count: present };
+        if (item.name === "Late") return { ...item, count: late };
+        return item;
+      }));
+    });
+
+    // 3. Fetch Leaves (Pending & On Leave Today)
+    const leavesQuery = query(collection(db, "leaves"));
+    const unsubscribeLeaves = onSnapshot(leavesQuery, (snapshot) => {
+      const leaves = snapshot.docs.map(doc => ({ id: doc.id, type: 'leave', ...doc.data() }));
+      
+      // Pending Leaves
+      setPendingLeaves(leaves.filter((l: any) => l.status === 'pending'));
+      
+      // On Leave Today
+      const todayDate = new Date();
+      todayDate.setHours(0,0,0,0);
+      const onLeaveCount = leaves.filter((l: any) => {
+        if (l.status !== 'Approved' && l.status !== 'approved') return false;
+        const start = new Date(l.from);
+        const end = new Date(l.to);
+        return todayDate >= start && todayDate <= end;
+      }).length;
+
+      setTodayAttendance(prev => prev.map(item => {
+        if (item.name === "On Leave") return { ...item, count: onLeaveCount };
+        return item;
+      }));
+    });
+
+    // 4. Fetch Increments (Pending)
+    const incrementsQuery = query(collection(db, "increments"), where("status", "==", "pending"));
+    const unsubscribeIncrements = onSnapshot(incrementsQuery, (snapshot) => {
+      setPendingIncrements(snapshot.docs.map(doc => ({ id: doc.id, type: 'increment', ...doc.data() })));
+    });
+
+    return () => {
+      unsubscribeUsers();
+      unsubscribeAttendance();
+      unsubscribeLeaves();
+      unsubscribeIncrements();
+    };
+  }, [db]);
+
+  // Combine pending requests and calculate absent count
+  useEffect(() => {
+    const allPending = [...pendingLeaves, ...pendingIncrements].sort((a, b) => {
+      const dateA = a.createdAt ? a.createdAt.toDate() : new Date();
+      const dateB = b.createdAt ? b.createdAt.toDate() : new Date();
+      return dateB.getTime() - dateA.getTime();
+    });
+    setPendingApprovals(allPending.slice(0, 5));
+    setStats(prev => ({ ...prev, pendingRequests: allPending.length }));
+
+    // Calculate Absent
+    const present = todayAttendance.find(i => i.name === "Present")?.count || 0;
+    const late = todayAttendance.find(i => i.name === "Late")?.count || 0;
+    const onLeave = todayAttendance.find(i => i.name === "On Leave")?.count || 0;
+    const absent = Math.max(0, stats.totalEmployees - (present + late + onLeave));
+    
+    setTodayAttendance(prev => prev.map(item => {
+      if (item.name === "Absent") return { ...item, count: absent };
+      return item;
+    }));
+  }, [pendingLeaves, pendingIncrements, stats.totalEmployees, todayAttendance[0].count, todayAttendance[1].count, todayAttendance[3].count]);
+
+  const handleExport = () => {
+    if (recentEmployees.length === 0) {
+      toast.warning("No employee data to export.");
+      return;
+    }
+
+    const headers = ["ID", "Name", "Email", "Role", "Salary", "Last Login"];
+    const csvRows = [headers.join(",")];
+
+    for (const emp of recentEmployees) {
+      const values = [
+        emp.id,
+        emp.displayName || emp.email,
+        emp.email,
+        emp.role || "Employee",
+        emp.currentSalary || 0,
+        emp.lastLogin ? format(emp.lastLogin.toDate(), "yyyy-MM-dd") : "N/A",
+      ];
+      csvRows.push(values.map(v => `"${v}"`).join(","));
+    }
+
+    const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.setAttribute("hidden", "");
+    a.setAttribute("href", url);
+    a.setAttribute("download", `employee-report-${format(new Date(), "yyyy-MM-dd")}.csv`);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    toast.success("Employee report exported successfully.");
+  };
+
+  const handleAddEmployee = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const auth = getAuth();
+    try {
+      // This is a simplified version. In a real app, you'd use Firebase Admin SDK on a server
+      // to create users without them having to log in. This client-side method is for demonstration.
+      const userCredential = await createUserWithEmailAndPassword(auth, newEmployee.email, newEmployee.password);
+      const newUser = userCredential.user;
+
+      await setDoc(doc(db, "users", newUser.uid), {
+        displayName: newEmployee.displayName,
+        email: newEmployee.email,
+        role: newEmployee.role,
+        createdAt: serverTimestamp(),
+      });
+
+      toast.success("Employee added successfully!");
+      setIsAddEmployeeOpen(false);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to add employee.");
+    }
+  };
 
   return (
     <DashboardLayout isAdmin>
@@ -77,14 +222,44 @@ export default function AdminDashboard() {
             </p>
           </div>
           <div className="flex gap-3">
-            <Button variant="outline" className="gap-2">
+            <Button variant="outline" className="gap-2" onClick={handleExport}>
               <Download className="w-4 h-4" />
               Export Report
             </Button>
-            <Button variant="hero" className="gap-2">
-              <UserPlus className="w-4 h-4" />
-              Add Employee
-            </Button>
+            <Dialog open={isAddEmployeeOpen} onOpenChange={setIsAddEmployeeOpen}>
+              <DialogTrigger asChild>
+                <Button variant="hero" className="gap-2">
+                  <UserPlus className="w-4 h-4" />
+                  Add Employee
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add New Employee</DialogTitle>
+                  <DialogDescription>
+                    Create a new user account and add them to the organization.
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleAddEmployee} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="displayName">Full Name</Label>
+                    <Input id="displayName" placeholder="John Doe" required onChange={(e) => setNewEmployee({...newEmployee, displayName: e.target.value})} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Work Email</Label>
+                    <Input id="email" type="email" placeholder="john.doe@company.com" required onChange={(e) => setNewEmployee({...newEmployee, email: e.target.value})} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Temporary Password</Label>
+                    <Input id="password" type="password" required onChange={(e) => setNewEmployee({...newEmployee, password: e.target.value})} />
+                  </div>
+                  <DialogFooter>
+                    <Button type="button" variant="outline" onClick={() => setIsAddEmployeeOpen(false)}>Cancel</Button>
+                    <Button type="submit">Create Employee</Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 
@@ -92,28 +267,28 @@ export default function AdminDashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             title="Total Employees"
-            value="54"
+            value={stats.totalEmployees}
             trend={{ value: 8, isPositive: true }}
             icon={Users}
             variant="primary"
           />
           <StatCard
             title="Present Today"
-            value="42"
-            subtitle="78% attendance"
+            value={stats.presentToday}
+            subtitle={`${stats.totalEmployees > 0 ? Math.round((stats.presentToday / stats.totalEmployees) * 100) : 0}% attendance`}
             icon={Clock}
             variant="success"
           />
           <StatCard
             title="Pending Requests"
-            value="7"
+            value={stats.pendingRequests}
             subtitle="Leave & Increments"
             icon={Calendar}
             variant="warning"
           />
           <StatCard
             title="Monthly Payroll"
-            value="₹186K"
+            value={`₹${(stats.monthlyPayroll / 1000).toFixed(1)}K`}
             trend={{ value: 12, isPositive: true }}
             icon={IndianRupee}
             variant="accent"
@@ -136,26 +311,26 @@ export default function AdminDashboard() {
               </Badge>
             </div>
             <div className="divide-y">
-              {pendingApprovals.map((item) => (
+              {pendingApprovals.length > 0 ? pendingApprovals.map((item) => (
                 <div
                   key={item.id}
                   className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors"
                 >
                   <div className="flex items-center gap-4">
                     <Avatar>
-                      <AvatarImage src={item.avatar} />
+                      <AvatarImage src={item.photoURL} />
                       <AvatarFallback className="bg-primary/10 text-primary">
-                        {item.initials}
+                        {item.userName?.substring(0, 2).toUpperCase() || "US"}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="font-medium text-foreground">{item.employee}</p>
-                      <p className="text-sm text-muted-foreground">{item.request}</p>
+                      <p className="font-medium text-foreground">{item.userName || "Unknown User"}</p>
+                      <p className="text-sm text-muted-foreground">{item.type === 'leave' ? `${item.type} - ${item.from}` : `Increment: ${item.expectedAmount}`}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground mr-2">
-                      {item.submittedAt}
+                      {item.createdAt ? formatDistanceToNow(item.createdAt.toDate(), { addSuffix: true }) : 'Just now'}
                     </span>
                     <Button size="sm" variant="ghost" className="text-success hover:bg-success/10">
                       <CheckCircle className="w-4 h-4" />
@@ -165,7 +340,9 @@ export default function AdminDashboard() {
                     </Button>
                   </div>
                 </div>
-              ))}
+              )) : (
+                <div className="p-4 text-center text-muted-foreground text-sm">No pending approvals</div>
+              )}
             </div>
           </div>
 
@@ -192,7 +369,7 @@ export default function AdminDashboard() {
                     <div className="h-2 bg-muted rounded-full overflow-hidden">
                       <div
                         className={`h-full ${item.color} rounded-full transition-all duration-500`}
-                        style={{ width: `${(item.count / 54) * 100}%` }}
+                        style={{ width: `${stats.totalEmployees > 0 ? (item.count / stats.totalEmployees) * 100 : 0}%` }}
                       />
                     </div>
                   </div>
@@ -213,33 +390,33 @@ export default function AdminDashboard() {
             </Button>
           </div>
           <div className="divide-y">
-            {recentEmployees.map((employee, index) => (
+            {recentEmployees.map((employee) => (
               <div
-                key={index}
+                key={employee.id}
                 className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors"
               >
                 <div className="flex items-center gap-4">
                   <Avatar>
                     <AvatarFallback className="bg-accent/10 text-accent">
-                      {employee.name.split(" ").map(n => n[0]).join("")}
+                      {employee.displayName?.substring(0, 2).toUpperCase() || "US"}
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="font-medium text-foreground">{employee.name}</p>
-                    <p className="text-sm text-muted-foreground">{employee.role}</p>
+                    <p className="font-medium text-foreground">{employee.displayName || employee.email}</p>
+                    <p className="text-sm text-muted-foreground">{employee.role || "Employee"}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="text-sm text-muted-foreground">{employee.joinDate}</span>
+                  <span className="text-sm text-muted-foreground">{employee.lastLogin ? new Date(employee.lastLogin.seconds * 1000).toLocaleDateString() : "-"}</span>
                   <Badge
                     variant="outline"
                     className={
-                      employee.status === "active"
+                      true // Assuming active for now
                         ? "bg-success/10 text-success border-success/20"
                         : "bg-warning/10 text-warning border-warning/20"
                     }
                   >
-                    {employee.status === "active" ? "Active" : "Pending Approval"}
+                    Active
                   </Badge>
                 </div>
               </div>

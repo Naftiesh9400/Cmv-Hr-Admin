@@ -25,6 +25,7 @@ export function ClockWidget({
   const [clockInTime, setClockInTime] = useState<Date | null>(null);
   const [workHours, setWorkHours] = useState("00:00:00");
   const [loading, setLoading] = useState(true);
+  const [totalDurationMs, setTotalDurationMs] = useState(0);
   const [locationInfo, setLocationInfo] = useState({
     city: "Detecting...",
     ip: "Detecting..."
@@ -41,13 +42,19 @@ export function ClockWidget({
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           const data = docSnap.data();
+          
+          // In a real app with multiple sessions per day, you'd sum them up.
+          // For this simple version, we'll just track the current session start.
+          // If you want to support multiple check-ins, you'd need a subcollection or array of sessions.
+          
           if (data.clockIn) {
             const startTime = data.clockIn.toDate();
-            setClockInTime(startTime);
             
             if (!data.clockOut) {
+              setClockInTime(startTime);
               setClockedIn(true);
             } else {
+              // If already clocked out, we might want to show the total time worked today
               setClockedIn(false);
               setClockInTime(null);
             }
@@ -85,23 +92,25 @@ export function ClockWidget({
   }, []);
 
   useEffect(() => {
-    if (!clockInTime) {
-      setWorkHours("00:00:00");
-      onWorkHoursChange?.("0h 0m");
-      return;
-    }
-
     const workHoursTimer = setInterval(() => {
-      const diff = new Date().getTime() - clockInTime.getTime();
+      let currentSessionMs = 0;
+      if (clockInTime) {
+        currentSessionMs = new Date().getTime() - clockInTime.getTime();
+      }
+      
+      const totalMs = totalDurationMs + currentSessionMs;
+      const diff = totalMs;
+
       const hours = Math.floor(diff / 3600000);
       const minutes = Math.floor((diff % 3600000) / 60000);
       const seconds = Math.floor((diff % 60000) / 1000);
+      
       setWorkHours(`${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`);
       onWorkHoursChange?.(`${hours}h ${minutes}m`);
     }, 1000);
 
     return () => clearInterval(workHoursTimer);
-  }, [clockInTime, onWorkHoursChange]);
+  }, [clockInTime, totalDurationMs, onWorkHoursChange]);
 
   const handleClockIn = async () => {
     if (!user) return;
@@ -158,13 +167,18 @@ export function ClockWidget({
         clockOut: serverTimestamp(),
       });
 
+      // Calculate duration of this session to add to total
+      if (clockInTime) {
+        const sessionDuration = new Date().getTime() - clockInTime.getTime();
+        setTotalDurationMs(prev => prev + sessionDuration);
+      }
+
       setClockedIn(false);
       toast.success("Clocked out successfully!", {
         description: `Total work hours: ${workHours}`,
       });
       setClockInTime(null);
-      setWorkHours("00:00:00");
-      onWorkHoursChange?.("0h 0m");
+      // Don't reset workHours display immediately so user can see their total for the day
       onClockOut?.();
     } catch (error) {
       toast.error("Failed to clock out");

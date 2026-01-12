@@ -1,5 +1,9 @@
-import { Clock, Calendar, DollarSign, FileText, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Clock, Calendar, DollarSign, FileText, CheckCircle, XCircle, AlertCircle, LogIn, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import { getFirestore, collection, query, where, orderBy, limit, onSnapshot } from "firebase/firestore";
+import { formatDistanceToNow } from "date-fns";
 
 interface Activity {
   id: string;
@@ -8,47 +12,8 @@ interface Activity {
   description: string;
   time: string;
   status?: "approved" | "rejected" | "pending";
+  timestamp?: Date;
 }
-
-const activities: Activity[] = [
-  {
-    id: "1",
-    type: "attendance",
-    title: "Clocked in",
-    description: "Started work at 9:00 AM",
-    time: "2 hours ago",
-  },
-  {
-    id: "2",
-    type: "leave",
-    title: "Leave Request Approved",
-    description: "Casual leave for Dec 25-26",
-    time: "Yesterday",
-    status: "approved",
-  },
-  {
-    id: "3",
-    type: "salary",
-    title: "Salary Credited",
-    description: "December salary deposited",
-    time: "2 days ago",
-  },
-  {
-    id: "4",
-    type: "increment",
-    title: "Increment Request",
-    description: "Under review by HR",
-    time: "1 week ago",
-    status: "pending",
-  },
-  {
-    id: "5",
-    type: "document",
-    title: "New Document",
-    description: "Offer letter available",
-    time: "2 weeks ago",
-  },
-];
 
 const typeIcons = {
   attendance: Clock,
@@ -79,6 +44,113 @@ const statusColors = {
 };
 
 export function RecentActivity() {
+  const { user } = useAuth();
+  const db = getFirestore();
+  const [activities, setActivities] = useState<Activity[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const attendanceQuery = query(
+      collection(db, "attendance"),
+      where("userId", "==", user.uid),
+      orderBy("date", "desc"),
+      limit(5)
+    );
+
+    const leavesQuery = query(
+      collection(db, "leaves"),
+      where("userId", "==", user.uid),
+      orderBy("createdAt", "desc"),
+      limit(5)
+    );
+
+    const incrementsQuery = query(
+      collection(db, "increments"),
+      where("userId", "==", user.uid),
+      orderBy("createdAt", "desc"),
+      limit(5)
+    );
+
+    let attendanceActivities: Activity[] = [];
+    let leaveActivities: Activity[] = [];
+    let incrementActivities: Activity[] = [];
+
+    const updateActivities = () => {
+      const allActivities = [...attendanceActivities, ...leaveActivities, ...incrementActivities];
+      allActivities.sort((a, b) => (b.timestamp?.getTime() || 0) - (a.timestamp?.getTime() || 0));
+      setActivities(allActivities.slice(0, 5));
+    };
+
+    const unsubAttendance = onSnapshot(attendanceQuery, (snapshot) => {
+      attendanceActivities = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.clockIn) {
+          attendanceActivities.push({
+            id: `${doc.id}_in`,
+            type: "attendance",
+            title: "Clocked In",
+            description: `Started work at ${data.clockIn.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+            time: formatDistanceToNow(data.clockIn.toDate(), { addSuffix: true }),
+            timestamp: data.clockIn.toDate(),
+          });
+        }
+        if (data.clockOut) {
+          attendanceActivities.push({
+            id: `${doc.id}_out`,
+            type: "attendance",
+            title: "Clocked Out",
+            description: `Finished work at ${data.clockOut.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+            time: formatDistanceToNow(data.clockOut.toDate(), { addSuffix: true }),
+            timestamp: data.clockOut.toDate(),
+          });
+        }
+      });
+      updateActivities();
+    });
+
+    const unsubLeaves = onSnapshot(leavesQuery, (snapshot) => {
+      leaveActivities = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        leaveActivities.push({
+          id: doc.id,
+          type: "leave",
+          title: "Leave Request",
+          description: `${data.type} (${data.from} to ${data.to})`,
+          time: data.createdAt ? formatDistanceToNow(data.createdAt.toDate(), { addSuffix: true }) : "Just now",
+          timestamp: data.createdAt ? data.createdAt.toDate() : new Date(),
+          status: (data.status?.toLowerCase() as any) || "pending",
+        });
+      });
+      updateActivities();
+    });
+
+    const unsubIncrements = onSnapshot(incrementsQuery, (snapshot) => {
+      incrementActivities = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        incrementActivities.push({
+          id: doc.id,
+          type: "increment",
+          title: "Increment Request",
+          description: `Request for ₹${data.expectedAmount} - ${data.reason}`,
+          time: data.createdAt ? formatDistanceToNow(data.createdAt.toDate(), { addSuffix: true }) : "Just now",
+          timestamp: data.createdAt ? data.createdAt.toDate() : new Date(),
+          status: (data.status?.toLowerCase() as any) || "pending",
+        });
+      });
+      updateActivities();
+    });
+
+    return () => {
+      unsubAttendance();
+      unsubLeaves();
+      unsubIncrements();
+    };
+  }, [user, db]);
+
   return (
     <div className="rounded-xl p-6 shadow-card border bg-card">
       <div className="flex items-center justify-between mb-6">
@@ -91,8 +163,10 @@ export function RecentActivity() {
       </div>
 
       <div className="space-y-4">
-        {activities.map((activity, index) => {
-          const Icon = typeIcons[activity.type];
+        {activities.length > 0 ? activities.map((activity, index) => {
+          let Icon = typeIcons[activity.type];
+          if (activity.title === "Clocked In") Icon = LogIn;
+          if (activity.title === "Clocked Out") Icon = LogOut;
           const StatusIcon = activity.status ? statusIcons[activity.status] : null;
 
           return (
@@ -133,7 +207,9 @@ export function RecentActivity() {
               </span>
             </div>
           );
-        })}
+        }) : (
+          <p className="text-sm text-muted-foreground text-center py-4">No recent activity</p>
+        )}
       </div>
     </div>
   );

@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -5,17 +6,74 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Download, Send } from "lucide-react";
 import { toast } from "sonner";
-
-const payrollData = [
-  { id: 1, name: "Sarah Johnson", role: "Product Designer", basic: 35000, allowances: 10000, deductions: 2500, net: 42500, status: "Paid", date: "Jan 31, 2024" },
-  { id: 2, name: "Michael Chen", role: "Senior Developer", basic: 45000, allowances: 12000, deductions: 3000, net: 54000, status: "Pending", date: "-" },
-  { id: 3, name: "Emily Davis", role: "HR Manager", basic: 40000, allowances: 8000, deductions: 2000, net: 46000, status: "Processing", date: "-" },
-  { id: 4, name: "James Wilson", role: "Marketing Lead", basic: 38000, allowances: 9000, deductions: 2200, net: 44800, status: "Paid", date: "Jan 31, 2024" },
-];
+import { getFirestore, collection, onSnapshot, addDoc, serverTimestamp, query, where } from "firebase/firestore";
+import { format } from "date-fns";
 
 export default function AdminPayroll() {
-  const handleProcess = (id: number) => {
-    toast.success("Payroll processed successfully");
+  const db = getFirestore();
+  const [users, setUsers] = useState<any[]>([]);
+  const [records, setRecords] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "users"), snap => {
+      setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, [db]);
+
+  useEffect(() => {
+    const currentMonth = format(new Date(), "MMMM yyyy");
+    const q = query(collection(db, "salary_records"), where("month", "==", currentMonth));
+    const unsub = onSnapshot(q, snap => {
+      setRecords(snap.docs.map(d => d.data()));
+    });
+    return () => unsub();
+  }, [db]);
+
+  const payrollData = users.map(user => {
+    const record = records.find((r: any) => r.userId === user.id);
+    const basic = Number(user.currentSalary) || 0;
+    const allowances = Number(user.allowances) || Math.round(basic * 0.2);
+    const deductions = Number(user.deductions) || Math.round(basic * 0.1);
+    const net = basic + allowances - deductions;
+
+    return {
+      id: user.id,
+      name: user.displayName || user.email,
+      role: user.role || "Employee",
+      basic,
+      allowances,
+      deductions,
+      net,
+      status: record ? "Paid" : "Pending",
+      date: record ? new Date(record.createdAt?.seconds * 1000).toLocaleDateString() : "-",
+    };
+  });
+
+  const handleProcess = async (employee: any) => {
+    setLoading(true);
+    try {
+      const currentMonth = format(new Date(), "MMMM yyyy");
+      
+      await addDoc(collection(db, "salary_records"), {
+        userId: employee.id,
+        userName: employee.name,
+        month: currentMonth,
+        basic: employee.basic,
+        allowances: employee.allowances,
+        deductions: employee.deductions,
+        netSalary: employee.net,
+        status: "Paid",
+        createdAt: serverTimestamp()
+      });
+
+      toast.success(`Payroll processed for ${employee.name}`);
+    } catch (error) {
+      toast.error("Failed to process payroll");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -27,7 +85,7 @@ export default function AdminPayroll() {
               Payroll Management
             </h1>
             <p className="text-muted-foreground mt-1">
-              Process salaries and manage payslips for January 2024
+              Process salaries and manage payslips for {format(new Date(), "MMMM yyyy")}
             </p>
           </div>
           <div className="flex gap-3">
@@ -62,7 +120,7 @@ export default function AdminPayroll() {
                     <div className="flex items-center gap-3">
                       <Avatar>
                         <AvatarFallback className="bg-primary/10 text-primary">
-                          {item.name.substring(0, 2).toUpperCase()}
+                          {item.name?.substring(0, 2).toUpperCase() || "US"}
                         </AvatarFallback>
                       </Avatar>
                       <div>
@@ -89,7 +147,7 @@ export default function AdminPayroll() {
                   </TableCell>
                   <TableCell className="text-right">
                     {item.status === "Pending" ? (
-                      <Button size="sm" onClick={() => handleProcess(item.id)}>Process</Button>
+                      <Button size="sm" onClick={() => handleProcess(item)} disabled={loading}>Process</Button>
                     ) : (
                       <Button size="sm" variant="ghost" disabled={item.status === "Processing"}>
                         <Download className="w-4 h-4" />

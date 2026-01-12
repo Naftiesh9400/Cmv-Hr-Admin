@@ -19,6 +19,11 @@ import AdminAttendance from "./pages/admin/AdminAttendance";
 import AdminLeave from "./pages/admin/AdminLeave";
 import AdminPayroll from "./pages/admin/AdminPayroll";
 import AdminIncrements from "./pages/admin/AdminIncrements";
+import AdminOrganization from "./pages/admin/AdminOrganization";
+import AdminRoles from "./pages/admin/AdminRoles";
+import AdminNotifications from "./pages/admin/AdminNotifications";
+import AdminSettings from "./pages/admin/AdminSettings";
+import AdminDocuments from "./pages/admin/AdminDocuments";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -50,6 +55,11 @@ const App = () => {
               <Route path="/admin/leave" element={<AdminLeave />} />
               <Route path="/admin/payroll" element={<AdminPayroll />} />
               <Route path="/admin/increments" element={<AdminIncrements />} />
+            <Route path="/admin/organization" element={<AdminOrganization />} />
+            <Route path="/admin/roles" element={<AdminRoles />} />
+            <Route path="/admin/notifications" element={<AdminNotifications />} />
+            <Route path="/admin/settings" element={<AdminSettings />} />
+            <Route path="/admin/documents" element={<AdminDocuments />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

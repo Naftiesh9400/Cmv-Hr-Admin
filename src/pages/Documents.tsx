@@ -1,17 +1,31 @@
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { useAuth } from "@/contexts/AuthContext";
+import { getFirestore, collection, query, onSnapshot, orderBy } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, Download, Upload, FileCheck, Shield } from "lucide-react";
-
-const documents = [
-  { id: 1, name: "Employment Contract", type: "PDF", size: "2.4 MB", date: "Jan 10, 2023", icon: FileCheck },
-  { id: 2, name: "NDA Agreement", type: "PDF", size: "1.1 MB", date: "Jan 10, 2023", icon: Shield },
-  { id: 3, name: "Offer Letter", type: "PDF", size: "1.8 MB", date: "Dec 15, 2022", icon: FileText },
-  { id: 4, name: "Tax Declaration 2023", type: "PDF", size: "0.8 MB", date: "Apr 01, 2023", icon: FileText },
-  { id: 5, name: "Employee Handbook", type: "PDF", size: "5.2 MB", date: "Jan 01, 2023", icon: FileText },
-];
+import { FileText, Download, ExternalLink } from "lucide-react";
 
 export default function Documents() {
+  const { user } = useAuth();
+  const db = getFirestore();
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const q = query(collection(db, "documents"), orderBy("createdAt", "desc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter((d: any) => d.userId === 'all' || d.userId === user.uid);
+      setDocuments(docs);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user, db]);
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -24,26 +38,25 @@ export default function Documents() {
               Access your personal files, contracts, and company policies
             </p>
           </div>
-          <Button variant="outline" className="gap-2">
-            <Upload className="w-4 h-4" />
-            Upload Document
-          </Button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {documents.map((doc) => (
+          {loading ? (
+            <div className="col-span-full text-center py-12 text-muted-foreground">Loading documents...</div>
+          ) : documents.length > 0 ? (
+            documents.map((doc) => (
             <Card key={doc.id} className="hover:shadow-md transition-shadow">
               <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 bg-primary/10 rounded-lg">
-                    <doc.icon className="w-6 h-6 text-primary" />
+                    <FileText className="w-6 h-6 text-primary" />
                   </div>
                   <div className="space-y-1">
                     <CardTitle className="text-base font-semibold leading-none">
                       {doc.name}
                     </CardTitle>
                     <CardDescription className="text-xs">
-                      {doc.type} • {doc.size}
+                      {doc.type}
                     </CardDescription>
                   </div>
                 </div>
@@ -53,13 +66,26 @@ export default function Documents() {
                   <span>Uploaded on</span>
                   <span>{doc.date}</span>
                 </div>
-                <Button variant="secondary" className="w-full gap-2">
-                  <Download className="w-4 h-4" />
-                  Download
+                <Button variant="secondary" className="w-full gap-2" asChild>
+                  <a href={doc.url} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="w-4 h-4" />
+                    Open Document
+                  </a>
                 </Button>
               </CardContent>
             </Card>
-          ))}
+          ))
+          ) : (
+            <div className="col-span-full flex flex-col items-center justify-center py-12 text-center">
+              <div className="bg-muted/50 p-4 rounded-full mb-3">
+                <FileText className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-semibold">No documents yet</h3>
+              <p className="text-muted-foreground max-w-sm mt-1">
+                Documents uploaded by your admin will appear here.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </DashboardLayout>

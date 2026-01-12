@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
-import { getFirestore, collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { getFirestore, collection, addDoc, serverTimestamp, query, where, orderBy, onSnapshot, doc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,57 +25,6 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar, Plus, CheckCircle, XCircle, Clock, Home } from "lucide-react";
 import { toast } from "sonner";
 
-const leaveTypes = [
-  { value: "casual", label: "Casual Leave", balance: 8, color: "bg-primary" },
-  { value: "sick", label: "Sick Leave", balance: 4, color: "bg-warning" },
-  { value: "paid", label: "Paid Leave", balance: 12, color: "bg-success" },
-  { value: "wfh", label: "Work from Home", balance: 10, color: "bg-accent" },
-];
-
-const leaveRequests = [
-  {
-    id: 1,
-    type: "Casual Leave",
-    from: "2024-01-20",
-    to: "2024-01-21",
-    days: 2,
-    reason: "Family function",
-    status: "approved",
-    appliedOn: "2024-01-10",
-  },
-  {
-    id: 2,
-    type: "Sick Leave",
-    from: "2024-01-15",
-    to: "2024-01-15",
-    days: 1,
-    reason: "Not feeling well",
-    status: "approved",
-    appliedOn: "2024-01-14",
-  },
-  {
-    id: 3,
-    type: "Work from Home",
-    from: "2024-01-25",
-    to: "2024-01-26",
-    days: 2,
-    reason: "Internet issue at office area",
-    status: "pending",
-    appliedOn: "2024-01-12",
-  },
-  {
-    id: 4,
-    type: "Paid Leave",
-    from: "2024-02-01",
-    to: "2024-02-05",
-    days: 5,
-    reason: "Vacation",
-    status: "rejected",
-    appliedOn: "2024-01-08",
-    rejectionNote: "Team deadline conflicts",
-  },
-];
-
 const statusIcons = {
   approved: CheckCircle,
   rejected: XCircle,
@@ -98,6 +47,47 @@ export default function Leave() {
     to: "",
     reason: ""
   });
+  const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
+  const [leaveBalances, setLeaveBalances] = useState([
+    { value: "casual", label: "Casual Leave", balance: 0, color: "bg-primary" },
+    { value: "sick", label: "Sick Leave", balance: 0, color: "bg-warning" },
+    { value: "paid", label: "Paid Leave", balance: 0, color: "bg-success" },
+    { value: "wfh", label: "Work from Home", balance: 0, color: "bg-accent" },
+  ]);
+
+  useEffect(() => {
+    if (!user) return;
+    const unsub = onSnapshot(doc(db, "users", user.uid), (doc) => {
+      if (doc.exists()) {
+        const data = doc.data();
+        const balances = data.leaveBalance || {};
+        setLeaveBalances([
+          { value: "casual", label: "Casual Leave", balance: balances.casual || 0, color: "bg-primary" },
+          { value: "sick", label: "Sick Leave", balance: balances.sick || 0, color: "bg-warning" },
+          { value: "paid", label: "Paid Leave", balance: balances.paid || 0, color: "bg-success" },
+          { value: "wfh", label: "Work from Home", balance: balances.wfh || 0, color: "bg-accent" },
+        ]);
+      }
+    });
+    return () => unsub();
+  }, [user, db]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const q = query(
+      collection(db, "leaves"),
+      where("userId", "==", user.uid),
+      orderBy("createdAt", "desc")
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const requests = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      setLeaveRequests(requests);
+    });
+
+    return () => unsubscribe();
+  }, [user, db]);
 
   const handleApplyLeave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,6 +101,17 @@ export default function Leave() {
         status: "pending",
         appliedOn: new Date().toISOString().split('T')[0],
         createdAt: serverTimestamp()
+      });
+
+      // Notify Admin
+      await addDoc(collection(db, "notifications"), {
+        recipientId: "admin",
+        title: "New Leave Request",
+        message: `${user.displayName || "Employee"} applied for ${formData.type}`,
+        type: "leave",
+        read: false,
+        createdAt: serverTimestamp(),
+        link: "/admin/leave"
       });
 
       toast.success("Leave request submitted!", {
@@ -157,8 +158,8 @@ export default function Leave() {
                       <SelectValue placeholder="Select leave type" />
                     </SelectTrigger>
                     <SelectContent>
-                      {leaveTypes.map((type) => (
-                        <SelectItem key={type.value} value={type.value}>
+                      {leaveBalances.map((type) => (
+                        <SelectItem key={type.value} value={type.label}>
                           {type.label} ({type.balance} days left)
                         </SelectItem>
                       ))}
@@ -203,7 +204,7 @@ export default function Leave() {
 
         {/* Leave Balance Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {leaveTypes.map((type) => (
+          {leaveBalances.map((type) => (
             <div
               key={type.value}
               className="p-4 rounded-xl bg-card border shadow-card"
@@ -229,7 +230,7 @@ export default function Leave() {
           </div>
           <div className="divide-y">
             {leaveRequests.map((request) => {
-              const StatusIcon = statusIcons[request.status as keyof typeof statusIcons];
+              const StatusIcon = statusIcons[request.status as keyof typeof statusIcons] || Clock;
               return (
                 <div
                   key={request.id}
@@ -247,7 +248,9 @@ export default function Leave() {
                       <div>
                         <p className="font-medium text-foreground">{request.type}</p>
                         <p className="text-sm text-muted-foreground">
-                          {request.from} to {request.to} • {request.days} day(s)
+                          {request.from} to {request.to} • {
+                            Math.ceil((new Date(request.to).getTime() - new Date(request.from).getTime()) / (1000 * 60 * 60 * 24)) + 1
+                          } day(s)
                         </p>
                         <p className="text-sm text-muted-foreground mt-1">
                           {request.reason}
@@ -262,7 +265,7 @@ export default function Leave() {
                     <div className="flex items-center gap-3 sm:flex-col sm:items-end">
                       <Badge
                         variant="outline"
-                        className={`gap-1 ${statusStyles[request.status as keyof typeof statusStyles]}`}
+                        className={`gap-1 ${statusStyles[request.status as keyof typeof statusStyles] || statusStyles.pending}`}
                       >
                         <StatusIcon className="w-3 h-3" />
                         {request.status.charAt(0).toUpperCase() + request.status.slice(1)}

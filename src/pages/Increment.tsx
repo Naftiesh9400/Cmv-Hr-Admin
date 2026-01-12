@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { useAuth } from "@/contexts/AuthContext";
+import { getFirestore, collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -39,20 +41,36 @@ const incrementHistory = [
 ];
 
 export default function Increment() {
+  const { user } = useAuth();
+  const db = getFirestore();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState({ expectedAmount: "", reason: "" });
 
-  const handleRequestIncrement = (e: React.FormEvent) => {
+  const handleRequestIncrement = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
     setIsLoading(true);
     
-    setTimeout(() => {
+    try {
+      await addDoc(collection(db, "increments"), {
+        userId: user.uid,
+        userName: user.displayName || user.email?.split('@')[0],
+        currentSalary: 45000, // Hardcoded for now as per UI
+        ...formData,
+        status: "pending",
+        date: new Date().toLocaleDateString(),
+        createdAt: serverTimestamp()
+      });
       setIsLoading(false);
       setIsDialogOpen(false);
       toast.success("Increment request submitted successfully!", {
         description: "Your request has been sent to HR for review.",
       });
-    }, 1000);
+    } catch (error) {
+      toast.error("Failed to submit request");
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -88,7 +106,7 @@ export default function Increment() {
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="expected-amount">Expected Amount / Percentage</Label>
-                  <Input id="expected-amount" placeholder="e.g. 50000 or 15%" required />
+                  <Input id="expected-amount" placeholder="e.g. 50000 or 15%" required onChange={(e) => setFormData({...formData, expectedAmount: e.target.value})} />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="reason">Reason for Increment</Label>
@@ -97,6 +115,7 @@ export default function Increment() {
                     placeholder="Describe your achievements and why you deserve an increment..." 
                     className="min-h-[100px]"
                     required 
+                    onChange={(e) => setFormData({...formData, reason: e.target.value})}
                   />
                 </div>
                 <div className="flex justify-end gap-3 pt-4">

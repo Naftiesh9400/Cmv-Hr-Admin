@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { getFirestore, collection, getDocs, query, orderBy, doc, updateDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -6,15 +8,30 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { CheckCircle, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
-const leaveRequests = [
-  { id: 1, employee: "Sarah Johnson", type: "Casual Leave", from: "2024-01-20", to: "2024-01-21", days: 2, reason: "Family function", status: "Pending" },
-  { id: 2, employee: "Michael Chen", type: "Sick Leave", from: "2024-01-15", to: "2024-01-15", days: 1, reason: "Fever", status: "Approved" },
-  { id: 3, employee: "Emily Davis", type: "Work from Home", from: "2024-01-25", to: "2024-01-26", days: 2, reason: "Internet issues", status: "Pending" },
-];
-
 export default function AdminLeave() {
-  const handleAction = (id: number, action: 'approve' | 'reject') => {
-    toast.success(`Leave request ${action}d successfully`);
+  const db = getFirestore();
+  const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchLeaveRequests();
+  }, []);
+
+  const fetchLeaveRequests = async () => {
+    const q = query(collection(db, "leaves"), orderBy("createdAt", "desc"));
+    const snapshot = await getDocs(q);
+    setLeaveRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+  };
+
+  const handleAction = async (id: string, action: 'approve' | 'reject') => {
+    try {
+      await updateDoc(doc(db, "leaves", id), {
+        status: action === 'approve' ? 'Approved' : 'Rejected'
+      });
+      toast.success(`Leave request ${action}d successfully`);
+      fetchLeaveRequests();
+    } catch (error) {
+      toast.error("Failed to update status");
+    }
   };
 
   return (
@@ -48,27 +65,26 @@ export default function AdminLeave() {
                     <div className="flex items-center gap-3">
                       <Avatar>
                         <AvatarFallback className="bg-primary/10 text-primary">
-                          {request.employee.substring(0, 2).toUpperCase()}
+                          {request.userName?.substring(0, 2).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
-                      <span className="font-medium">{request.employee}</span>
+                      <span className="font-medium">{request.userName}</span>
                     </div>
                   </TableCell>
                   <TableCell>{request.type}</TableCell>
                   <TableCell>
                     <div className="text-sm">
                       <p>{request.from} to {request.to}</p>
-                      <p className="text-muted-foreground text-xs">{request.days} days</p>
                     </div>
                   </TableCell>
                   <TableCell className="max-w-[200px] truncate" title={request.reason}>{request.reason}</TableCell>
                   <TableCell>
-                    <Badge variant="outline" className={request.status === "Approved" ? "bg-success/10 text-success border-success/20" : request.status === "Pending" ? "bg-warning/10 text-warning border-warning/20" : "bg-destructive/10 text-destructive border-destructive/20"}>
+                    <Badge variant="outline" className={request.status === "Approved" ? "bg-success/10 text-success border-success/20" : request.status === "pending" ? "bg-warning/10 text-warning border-warning/20" : "bg-destructive/10 text-destructive border-destructive/20"}>
                       {request.status}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    {request.status === "Pending" && (
+                    {request.status === "pending" && (
                       <div className="flex justify-end gap-2">
                         <Button size="sm" variant="ghost" className="text-success hover:bg-success/10 hover:text-success" onClick={() => handleAction(request.id, 'approve')}>
                           <CheckCircle className="w-4 h-4" />

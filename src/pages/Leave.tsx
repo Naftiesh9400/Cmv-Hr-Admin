@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { useAuth } from "@/contexts/AuthContext";
+import { getFirestore, collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -87,13 +89,35 @@ const statusStyles = {
 };
 
 export default function Leave() {
+  const { user } = useAuth();
+  const db = getFirestore();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    type: "",
+    from: "",
+    to: "",
+    reason: ""
+  });
 
-  const handleApplyLeave = (e: React.FormEvent) => {
+  const handleApplyLeave = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success("Leave request submitted!", {
-      description: "Your request will be reviewed by HR",
-    });
+    if (!user) return;
+
+    try {
+      await addDoc(collection(db, "leaves"), {
+        userId: user.uid,
+        userName: user.displayName || user.email?.split('@')[0],
+        ...formData,
+        status: "pending",
+        appliedOn: new Date().toISOString().split('T')[0],
+        createdAt: serverTimestamp()
+      });
+      toast.success("Leave request submitted!", {
+        description: "Your request will be reviewed by HR",
+      });
+    } catch (error) {
+      toast.error("Failed to submit leave request");
+    }
     setDialogOpen(false);
   };
 
@@ -127,7 +151,7 @@ export default function Leave() {
               <form onSubmit={handleApplyLeave} className="space-y-4 mt-4">
                 <div className="space-y-2">
                   <Label>Leave Type</Label>
-                  <Select>
+                  <Select onValueChange={(value) => setFormData({...formData, type: value})}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select leave type" />
                     </SelectTrigger>
@@ -143,11 +167,11 @@ export default function Leave() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>From Date</Label>
-                    <Input type="date" required />
+                    <Input type="date" required onChange={(e) => setFormData({...formData, from: e.target.value})} />
                   </div>
                   <div className="space-y-2">
                     <Label>To Date</Label>
-                    <Input type="date" required />
+                    <Input type="date" required onChange={(e) => setFormData({...formData, to: e.target.value})} />
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -156,6 +180,7 @@ export default function Leave() {
                     placeholder="Explain your reason for leave..."
                     rows={3}
                     required
+                    onChange={(e) => setFormData({...formData, reason: e.target.value})}
                   />
                 </div>
                 <div className="flex justify-end gap-3 pt-4">

@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { getFirestore, collection, getDocs } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -6,15 +8,18 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Search, UserPlus, MoreVertical, Mail, Phone } from "lucide-react";
 
-const employees = [
-  { id: 1, name: "Sarah Johnson", role: "Product Designer", email: "sarah@company.com", phone: "+1 234 567 890", status: "Active", department: "Design", joinDate: "Jan 15, 2023" },
-  { id: 2, name: "Michael Chen", role: "Senior Developer", email: "michael@company.com", phone: "+1 234 567 891", status: "Active", department: "Engineering", joinDate: "Feb 01, 2023" },
-  { id: 3, name: "Emily Davis", role: "HR Manager", email: "emily@company.com", phone: "+1 234 567 892", status: "On Leave", department: "HR", joinDate: "Mar 10, 2023" },
-  { id: 4, name: "James Wilson", role: "Marketing Lead", email: "james@company.com", phone: "+1 234 567 893", status: "Active", department: "Marketing", joinDate: "Apr 05, 2023" },
-  { id: 5, name: "Lisa Anderson", role: "Frontend Dev", email: "lisa@company.com", phone: "+1 234 567 894", status: "Inactive", department: "Engineering", joinDate: "May 20, 2023" },
-];
-
 export default function AdminEmployees() {
+  const db = getFirestore();
+  const [employees, setEmployees] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      const snapshot = await getDocs(collection(db, "users"));
+      setEmployees(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    };
+    fetchEmployees();
+  }, []);
+
   return (
     <DashboardLayout isAdmin>
       <div className="space-y-6">
@@ -60,29 +65,29 @@ export default function AdminEmployees() {
                       <Avatar>
                         <AvatarImage src="" />
                         <AvatarFallback className="bg-primary/10 text-primary">
-                          {employee.name.substring(0, 2).toUpperCase()}
+                          {employee.displayName?.substring(0, 2).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="font-medium">{employee.name}</p>
-                        <p className="text-xs text-muted-foreground">ID: EMP-{employee.id.toString().padStart(3, '0')}</p>
+                        <p className="font-medium">{employee.displayName}</p>
+                        <p className="text-xs text-muted-foreground">ID: {employee.id.substring(0, 6)}</p>
                       </div>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <p className="font-medium">{employee.role}</p>
-                    <p className="text-xs text-muted-foreground">{employee.department}</p>
+                    <p className="font-medium">{employee.role || "Employee"}</p>
+                    <p className="text-xs text-muted-foreground">{employee.department || "-"}</p>
                   </TableCell>
                   <TableCell>
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 text-xs text-muted-foreground"><Mail className="w-3 h-3" /> {employee.email}</div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground"><Phone className="w-3 h-3" /> {employee.phone}</div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground"><Phone className="w-3 h-3" /> {employee.phone || "-"}</div>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className={employee.status === "Active" ? "bg-success/10 text-success border-success/20" : employee.status === "Inactive" ? "bg-destructive/10 text-destructive border-destructive/20" : "bg-warning/10 text-warning border-warning/20"}>{employee.status}</Badge>
+                    <Badge variant="outline" className="bg-success/10 text-success border-success/20">Active</Badge>
                   </TableCell>
-                  <TableCell>{employee.joinDate}</TableCell>
+                  <TableCell>{employee.lastLogin ? new Date(employee.lastLogin.seconds * 1000).toLocaleDateString() : "-"}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="icon"><MoreVertical className="w-4 h-4" /></Button>
                   </TableCell>

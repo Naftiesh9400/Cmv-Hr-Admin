@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { signInWithPopup, signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { getFirestore, doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, googleProvider } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +26,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const db = getFirestore();
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,6 +45,14 @@ export default function Login() {
       const result = await signInWithEmailAndPassword(auth, email, password);
       const user = result.user;
       
+      await setDoc(doc(db, "users", user.uid), {
+        email: user.email,
+        displayName: user.displayName || user.email?.split('@')[0],
+        photoURL: user.photoURL,
+        lastLogin: serverTimestamp(),
+        role: "employee"
+      }, { merge: true });
+
       toast.success(`Welcome back, ${user.displayName || user.email}!`);
       
       navigate("/dashboard");
@@ -89,6 +99,14 @@ export default function Login() {
         setIsLoading(false);
         return;
       }
+
+      await setDoc(doc(db, "users", user.uid), {
+        email: user.email,
+        displayName: user.displayName || user.email?.split('@')[0],
+        photoURL: user.photoURL,
+        lastLogin: serverTimestamp(),
+        role: "employee"
+      }, { merge: true });
 
       toast.success(`Welcome, ${user.displayName}!`);
       

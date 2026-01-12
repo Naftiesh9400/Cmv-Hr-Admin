@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -22,34 +23,40 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <AuthProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Login />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/attendance" element={<Attendance />} />
-            <Route path="/leave" element={<Leave />} />
-            <Route path="/salary" element={<Salary />} />
-            <Route path="/increment" element={<Increment />} />
-            <Route path="/documents" element={<Documents />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/employees" element={<AdminEmployees />} />
-            <Route path="/admin/attendance" element={<AdminAttendance />} />
-            <Route path="/admin/leave" element={<AdminLeave />} />
-            <Route path="/admin/payroll" element={<AdminPayroll />} />
-            <Route path="/admin/increments" element={<AdminIncrements />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </AuthProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  useEffect(() => {
+    document.title = "CMV Cloud HR";
+  }, []);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <AuthProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Login />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/attendance" element={<Attendance />} />
+              <Route path="/leave" element={<Leave />} />
+              <Route path="/salary" element={<Salary />} />
+              <Route path="/increment" element={<Increment />} />
+              <Route path="/documents" element={<Documents />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/admin/employees" element={<AdminEmployees />} />
+              <Route path="/admin/attendance" element={<AdminAttendance />} />
+              <Route path="/admin/leave" element={<AdminLeave />} />
+              <Route path="/admin/payroll" element={<AdminPayroll />} />
+              <Route path="/admin/increments" element={<AdminIncrements />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </AuthProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;

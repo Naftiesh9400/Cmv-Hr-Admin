@@ -112,6 +112,7 @@ export default function Leave() {
         appliedOn: new Date().toISOString().split('T')[0],
         createdAt: serverTimestamp()
       });
+
       toast.success("Leave request submitted!", {
         description: "Your request will be reviewed by HR",
       });

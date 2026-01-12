@@ -23,10 +23,14 @@ export default function AdminLeave() {
   };
 
   const handleAction = async (id: string, action: 'approve' | 'reject') => {
+    const request = leaveRequests.find(r => r.id === id);
+    if (!request) return;
+
     try {
       await updateDoc(doc(db, "leaves", id), {
         status: action === 'approve' ? 'Approved' : 'Rejected'
       });
+
       toast.success(`Leave request ${action}d successfully`);
       fetchLeaveRequests();
     } catch (error) {

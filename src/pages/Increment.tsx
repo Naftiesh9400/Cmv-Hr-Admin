@@ -62,6 +62,7 @@ export default function Increment() {
         date: new Date().toLocaleDateString(),
         createdAt: serverTimestamp()
       });
+
       setIsLoading(false);
       setIsDialogOpen(false);
       toast.success("Increment request submitted successfully!", {

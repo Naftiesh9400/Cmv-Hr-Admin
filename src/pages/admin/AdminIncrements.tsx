@@ -23,10 +23,14 @@ export default function AdminIncrements() {
   };
 
   const handleAction = async (id: string, action: 'approve' | 'reject') => {
+    const request = incrementRequests.find(r => r.id === id);
+    if (!request) return;
+
     try {
       await updateDoc(doc(db, "increments", id), {
         status: action === 'approve' ? 'Approved' : 'Rejected'
       });
+
       toast.success(`Increment request ${action}d`);
       fetchRequests();
     } catch (error) {

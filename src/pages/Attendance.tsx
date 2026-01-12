@@ -1,0 +1,357 @@
+import { useState, useEffect, useMemo } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { getFirestore, collection, query, where, getDocs } from "firebase/firestore";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { addDays, format } from "date-fns";
+import { DateRange } from "react-day-picker";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Calendar as CalendarIcon,
+  Clock,
+  Download,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+
+const statusStyles = {
+  present: "bg-success/10 text-success border-success/20",
+  late: "bg-warning/10 text-warning border-warning/20",
+  absent: "bg-destructive/10 text-destructive border-destructive/20",
+  halfday: "bg-primary/10 text-primary border-primary/20",
+  weekend: "bg-muted text-muted-foreground border-muted",
+};
+
+const statusLabels = {
+  present: "Present",
+  late: "Late",
+  absent: "Absent",
+  halfday: "Half Day",
+  weekend: "Weekend",
+};
+
+export default function Attendance() {
+  const { user } = useAuth();
+  const db = getFirestore();
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: addDays(new Date(), -30),
+    to: new Date(),
+  });
+  const [attendanceData, setAttendanceData] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchAttendance = async () => {
+      if (!user) return;
+      try {
+        const q = query(collection(db, "attendance"), where("userId", "==", user.uid));
+        const querySnapshot = await getDocs(q);
+        const data = querySnapshot.docs.map(doc => {
+          const d = doc.data();
+          const dateObj = new Date(d.date);
+          const clockIn = d.clockIn ? d.clockIn.toDate() : null;
+          const clockOut = d.clockOut ? d.clockOut.toDate() : null;
+          
+          let workHours = "-";
+          if (clockIn && clockOut) {
+            const diff = clockOut.getTime() - clockIn.getTime();
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            workHours = `${hours}h ${minutes}m`;
+          }
+
+          return {
+            date: d.date,
+            day: dateObj.toLocaleDateString('en-US', { weekday: 'long' }),
+            clockIn: clockIn ? clockIn.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "-",
+            clockOut: clockOut ? clockOut.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "-",
+            workHours,
+            status: d.status || "absent"
+          };
+        });
+        setAttendanceData(data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      } catch (error) {
+        console.error("Error fetching attendance:", error);
+      }
+    };
+    fetchAttendance();
+  }, [user, db]);
+
+  const filteredData = useMemo(() => {
+    if (!dateRange?.from) return attendanceData;
+    
+    return attendanceData.filter(record => {
+      const recordDate = new Date(record.date);
+      recordDate.setHours(0, 0, 0, 0);
+      
+      const from = new Date(dateRange.from!);
+      from.setHours(0, 0, 0, 0);
+      
+      const to = dateRange.to ? new Date(dateRange.to) : new Date(from);
+      to.setHours(23, 59, 59, 999);
+      
+      return recordDate >= from && recordDate <= to;
+    });
+  }, [attendanceData, dateRange]);
+
+  const chartData = useMemo(() => {
+    // Create a copy and reverse to show chronological order (oldest to newest)
+    return [...filteredData].reverse().map(record => {
+      let hours = 0;
+      if (record.workHours !== "-") {
+        const parts = record.workHours.split("h ");
+        if (parts.length === 2) {
+          hours = parseInt(parts[0]) + parseInt(parts[1].replace("m", "")) / 60;
+        }
+      }
+      return {
+        date: format(new Date(record.date), "MMM dd"),
+        hours: Number(hours.toFixed(1)),
+        fullDate: record.date
+      };
+    });
+  }, [filteredData]);
+
+  const averageWorkHours = useMemo(() => {
+    // Use filteredData instead of attendanceData
+    const validRecords = filteredData.filter((r) => r.workHours !== "-");
+    if (validRecords.length === 0) return "-";
+
+    const totalMinutes = validRecords.reduce((acc, record) => {
+      const parts = record.workHours.split("h ");
+      if (parts.length !== 2) return acc;
+      const hours = parseInt(parts[0]);
+      const minutes = parseInt(parts[1].replace("m", ""));
+      return acc + hours * 60 + minutes;
+    }, 0);
+
+    const avgMinutes = totalMinutes / validRecords.length;
+    const h = Math.floor(avgMinutes / 60);
+    const m = Math.round(avgMinutes % 60);
+
+    return `${h}h ${m}m`;
+  }, [filteredData]);
+
+  const handleExportCSV = () => {
+    if (!filteredData.length) return;
+
+    const headers = ["Date", "Day", "Clock In", "Clock Out", "Work Hours", "Status"];
+    const csvRows = [headers.join(",")];
+
+    for (const row of filteredData) {
+      const values = [
+        row.date,
+        row.day,
+        row.clockIn,
+        row.clockOut,
+        row.workHours,
+        row.status,
+      ];
+      csvRows.push(values.join(","));
+    }
+
+    const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.setAttribute("hidden", "");
+    a.setAttribute("href", url);
+    a.setAttribute("download", `attendance-report-${format(new Date(), "yyyy-MM-dd")}.csv`);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  return (
+    <DashboardLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="font-display text-2xl sm:text-3xl font-bold text-foreground">
+              Attendance History
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Track your daily attendance and work hours
+            </p>
+          </div>
+          <Button variant="outline" className="gap-2" onClick={handleExportCSV}>
+            <Download className="w-4 h-4" />
+            Export Report
+          </Button>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="p-4 rounded-xl bg-success/10 border border-success/20">
+            <p className="text-sm text-muted-foreground">Present Days</p>
+            <p className="text-2xl font-bold font-display text-success">{filteredData.filter(d => d.status === 'present').length}</p>
+          </div>
+          <div className="p-4 rounded-xl bg-warning/10 border border-warning/20">
+            <p className="text-sm text-muted-foreground">Late Arrivals</p>
+            <p className="text-2xl font-bold font-display text-warning">{filteredData.filter(d => d.status === 'late').length}</p>
+          </div>
+          <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20">
+            <p className="text-sm text-muted-foreground">Absent Days</p>
+            <p className="text-2xl font-bold font-display text-destructive">{filteredData.filter(d => d.status === 'absent').length}</p>
+          </div>
+          <div className="p-4 rounded-xl bg-primary/10 border border-primary/20">
+            <p className="text-sm text-muted-foreground">Avg. Hours/Day</p>
+            <p className="text-2xl font-bold font-display text-primary">{averageWorkHours}</p>
+          </div>
+        </div>
+
+        {/* Daily Work Hours Chart */}
+        <div className="rounded-xl border bg-card shadow-card p-6">
+          <h3 className="font-display font-semibold text-lg mb-4">Daily Work Hours</h3>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="date" />
+                <YAxis />
+                <RechartsTooltip 
+                  contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))' }}
+                  itemStyle={{ color: 'hsl(var(--foreground))' }}
+                />
+                <Bar dataKey="hours" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="flex flex-wrap gap-3">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                id="date"
+                variant={"outline"}
+                className={cn(
+                  "w-[300px] justify-start text-left font-normal",
+                  !dateRange && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {dateRange?.from ? (
+                  dateRange.to ? (
+                    <>
+                      {format(dateRange.from, "LLL dd, y")} -{" "}
+                      {format(dateRange.to, "LLL dd, y")}
+                    </>
+                  ) : (
+                    format(dateRange.from, "LLL dd, y")
+                  )
+                ) : (
+                  <span>Pick a date</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                initialFocus
+                mode="range"
+                defaultMonth={dateRange?.from}
+                selected={dateRange}
+                onSelect={setDateRange}
+                numberOfMonths={2}
+              />
+            </PopoverContent>
+          </Popover>
+
+          <Select>
+            <SelectTrigger className="w-[150px]">
+              <Filter className="w-4 h-4 mr-2" />
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="present">Present</SelectItem>
+              <SelectItem value="late">Late</SelectItem>
+              <SelectItem value="absent">Absent</SelectItem>
+              <SelectItem value="halfday">Half Day</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Attendance Table */}
+        <div className="rounded-xl border bg-card shadow-card overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                <TableHead>Date</TableHead>
+                <TableHead>Day</TableHead>
+                <TableHead>Clock In</TableHead>
+                <TableHead>Clock Out</TableHead>
+                <TableHead>Work Hours</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredData.map((record) => (
+                <TableRow key={record.date} className="hover:bg-muted/30">
+                  <TableCell className="font-medium">{record.date}</TableCell>
+                  <TableCell>{record.day}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-muted-foreground" />
+                      {record.clockIn}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-muted-foreground" />
+                      {record.clockOut}
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-medium">{record.workHours}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant="outline"
+                      className={statusStyles[record.status as keyof typeof statusStyles]}
+                    >
+                      {statusLabels[record.status as keyof typeof statusLabels]}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+
+          {/* Pagination */}
+          <div className="flex items-center justify-between px-4 py-3 border-t">
+            <p className="text-sm text-muted-foreground">
+              Showing recent records
+            </p>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm">
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <Button variant="outline" size="sm">
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </DashboardLayout>
+  );
+}

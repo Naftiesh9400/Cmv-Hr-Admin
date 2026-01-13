@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Clock, MapPin, Wifi } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import { getFirestore, doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, serverTimestamp, addDoc, collection } from "firebase/firestore";
 
 interface ClockWidgetProps {
   isClockedIn?: boolean;
@@ -30,6 +30,7 @@ export function ClockWidget({
     city: "Detecting...",
     ip: "Detecting..."
   });
+  const [adminEmail, setAdminEmail] = useState("help@cmv-global.com");
 
   useEffect(() => {
     const fetchAttendance = async () => {
@@ -43,21 +44,39 @@ export function ClockWidget({
         if (docSnap.exists()) {
           const data = docSnap.data();
           
-          // In a real app with multiple sessions per day, you'd sum them up.
-          // For this simple version, we'll just track the current session start.
-          // If you want to support multiple check-ins, you'd need a subcollection or array of sessions.
+          // Handle multiple sessions
+          let sessions = data.sessions || [];
           
-          if (data.clockIn) {
-            const startTime = data.clockIn.toDate();
+          // Backward compatibility: if no sessions but root clockIn exists
+          if (sessions.length === 0 && data.clockIn) {
+             sessions = [{
+                 clockIn: data.clockIn,
+                 clockOut: data.clockOut || null
+             }];
+          }
+
+          let totalMs = 0;
+          let activeStart = null;
+
+          sessions.forEach((session: any) => {
+            const start = session.clockIn?.toDate ? session.clockIn.toDate() : new Date(session.clockIn);
+            const end = session.clockOut?.toDate ? session.clockOut.toDate() : (session.clockOut ? new Date(session.clockOut) : null);
             
-            if (!data.clockOut) {
-              setClockInTime(startTime);
-              setClockedIn(true);
-            } else {
-              // If already clocked out, we might want to show the total time worked today
-              setClockedIn(false);
-              setClockInTime(null);
+            if (start && end) {
+              totalMs += end.getTime() - start.getTime();
+            } else if (start && !end) {
+              activeStart = start;
             }
+          });
+
+          setTotalDurationMs(totalMs);
+          
+          if (activeStart) {
+            setClockInTime(activeStart);
+            setClockedIn(true);
+          } else {
+            setClockedIn(false);
+            setClockInTime(null);
           }
         }
       } catch (error) {
@@ -69,6 +88,20 @@ export function ClockWidget({
 
     fetchAttendance();
   }, [user, db]);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const settingsSnap = await getDoc(doc(db, "settings", "general"));
+        if (settingsSnap.exists()) {
+          setAdminEmail(settingsSnap.data().adminEmail || "help@cmv-global.com");
+        }
+      } catch (e) {
+        console.error("Error fetching settings", e);
+      }
+    };
+    fetchSettings();
+  }, [db]);
 
   useEffect(() => {
     const fetchLocation = async () => {
@@ -135,16 +168,37 @@ export function ClockWidget({
       const today = new Date().toISOString().split("T")[0];
       const docRef = doc(db, "attendance", `${user.uid}_${today}`);
       const now = new Date();
-
-      await setDoc(docRef, {
-        userId: user.uid,
-        date: today,
-        clockIn: serverTimestamp(),
-        status: "present",
-      });
+      
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const sessions = data.sessions || [];
+        const newSessions = [...sessions, { clockIn: now, clockOut: null }];
+        await updateDoc(docRef, { sessions: newSessions });
+      } else {
+        await setDoc(docRef, {
+          userId: user.uid,
+          date: today,
+          status: "present",
+          sessions: [{ clockIn: now, clockOut: null }]
+        });
+      }
 
       setClockedIn(true);
       setClockInTime(now);
+
+      // Notify Admin
+      await addDoc(collection(db, "notifications"), {
+        recipientId: "admin",
+        title: "Employee Clocked In",
+        message: `${user.displayName || user.email} has clocked in at ${now.toLocaleTimeString()}.`,
+        type: "attendance",
+        read: false,
+        createdAt: serverTimestamp(),
+        link: "/admin/attendance"
+      });
+
       toast.success("Clocked in successfully!", {
         description: `You're now checked in at ${now.toLocaleTimeString()}`,
       });
@@ -162,16 +216,36 @@ export function ClockWidget({
     try {
       const today = new Date().toISOString().split("T")[0];
       const docRef = doc(db, "attendance", `${user.uid}_${today}`);
+      const now = new Date();
 
-      await updateDoc(docRef, {
-        clockOut: serverTimestamp(),
-      });
-
-      // Calculate duration of this session to add to total
-      if (clockInTime) {
-        const sessionDuration = new Date().getTime() - clockInTime.getTime();
-        setTotalDurationMs(prev => prev + sessionDuration);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const sessions = data.sessions || [];
+        const openSessionIndex = sessions.findIndex((s: any) => !s.clockOut);
+        
+        if (openSessionIndex !== -1) {
+          const newSessions = [...sessions];
+          newSessions[openSessionIndex].clockOut = now;
+          await updateDoc(docRef, { sessions: newSessions });
+          
+          // Update local total duration
+          const start = newSessions[openSessionIndex].clockIn.toDate ? newSessions[openSessionIndex].clockIn.toDate() : newSessions[openSessionIndex].clockIn;
+          const sessionDuration = now.getTime() - start.getTime();
+          setTotalDurationMs(prev => prev + sessionDuration);
+        }
       }
+
+      // Notify Admin
+      await addDoc(collection(db, "notifications"), {
+        recipientId: "admin",
+        title: "Employee Clocked Out",
+        message: `${user.displayName || user.email} has clocked out. Work duration: ${workHours}`,
+        type: "attendance",
+        read: false,
+        createdAt: serverTimestamp(),
+        link: "/admin/attendance"
+      });
 
       setClockedIn(false);
       toast.success("Clocked out successfully!", {

@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { getFirestore, collection, getDocs, query, orderBy, limit } from "firebase/firestore";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Clock, Calendar as CalendarIcon, Search } from "lucide-react";
+import { Clock, Calendar as CalendarIcon, Search, FileDown } from "lucide-react";
 import { format } from "date-fns";
+import { toast } from "sonner";
 
 export default function AdminAttendance() {
   const db = getFirestore();
@@ -55,16 +57,51 @@ export default function AdminAttendance() {
     record.date?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const downloadCSV = () => {
+    const headers = ["User ID", "Date", "Clock In", "Clock Out", "Work Hours", "Status"];
+    const csvRows = [headers.join(",")];
+
+    for (const record of filteredData) {
+      const values = [
+      record.userId,
+      record.date,
+      record.clockIn,
+      record.clockOut,
+      record.workHours,
+      record.status
+      ];
+      csvRows.push(values.join(","));
+    }
+
+    const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.setAttribute("hidden", "");
+    a.setAttribute("href", url);
+    a.setAttribute("download", `attendance_report_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    toast.success("Attendance report downloaded successfully");
+  };
+
   return (
     <DashboardLayout isAdmin>
       <div className="space-y-6">
-        <div>
-          <h1 className="font-display text-2xl sm:text-3xl font-bold text-foreground">
-            Attendance Overview
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Monitor employee check-ins and work hours
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="font-display text-2xl sm:text-3xl font-bold text-foreground">
+              Attendance Overview
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Monitor employee check-ins and work hours
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={downloadCSV}>
+              <FileDown className="w-4 h-4 mr-2" /> Download CSV
+            </Button>
+          </div>
         </div>
 
         <div className="flex items-center gap-4 bg-card p-4 rounded-xl border shadow-sm">

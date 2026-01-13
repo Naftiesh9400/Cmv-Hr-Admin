@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Clock, MapPin, Wifi } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import { getFirestore, doc, getDoc, setDoc, updateDoc, serverTimestamp, addDoc, collection } from "firebase/firestore";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, serverTimestamp, addDoc, collection, onSnapshot } from "firebase/firestore";
 
 interface ClockWidgetProps {
   isClockedIn?: boolean;
@@ -31,6 +31,8 @@ export function ClockWidget({
     ip: "Detecting..."
   });
   const [adminEmail, setAdminEmail] = useState("help@cmv-global.com");
+  const [settings, setSettings] = useState<any>({});
+  const [holidays, setHolidays] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchAttendance = async () => {
@@ -92,10 +94,18 @@ export function ClockWidget({
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const settingsSnap = await getDoc(doc(db, "settings", "general"));
-        if (settingsSnap.exists()) {
-          setAdminEmail(settingsSnap.data().adminEmail || "help@cmv-global.com");
-        }
+        onSnapshot(doc(db, "settings", "general"), (doc) => {
+          if (doc.exists()) {
+            const data = doc.data();
+            setSettings(data);
+            setAdminEmail(data.adminEmail || "help@cmv-global.com");
+          }
+        });
+
+        onSnapshot(collection(db, "holidays"), (snap) => {
+          setHolidays(snap.docs.map(d => d.data().date));
+        });
+
       } catch (e) {
         console.error("Error fetching settings", e);
       }
@@ -150,15 +160,14 @@ export function ClockWidget({
 
     const now = new Date();
     const day = now.getDay();
-    const dateString = now.toISOString().split("T")[0];
-    const holidays = ["2024-01-01", "2024-01-26", "2024-08-15", "2024-10-02", "2024-12-25"];
+    const dateString = now.toISOString().split('T')[0];
 
-    if (day === 0 || day === 6) {
+    if ((day === 0 || day === 6) && !settings.allowWeekendAccess) {
       toast.error("Check-in is not allowed on weekends.");
       return;
     }
 
-    if (holidays.includes(dateString)) {
+    if (holidays.includes(dateString) && !settings.allowWeekendAccess) {
       toast.error("Check-in is not allowed on holidays.");
       return;
     }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { getFirestore, collection, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, onSnapshot, getDoc } from "firebase/firestore";
+import { getFirestore, collection, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, onSnapshot, getDoc, runTransaction } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -13,13 +13,29 @@ export default function AdminLeave() {
   const db = getFirestore();
   const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [settings, setSettings] = useState<any>({});
 
   useEffect(() => {
     const q = query(collection(db, "leaves"), orderBy("createdAt", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setLeaveRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const requests = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setLeaveRequests(requests);
+      // Auto-approve logic can be triggered here
+      if (settings.autoApproveLeave) {
+        autoApproveLeaves(requests);
+      }
     });
-    return () => unsubscribe();
+
+    const settingsUnsub = onSnapshot(doc(db, "settings", "general"), (doc) => {
+      if (doc.exists()) {
+        setSettings(doc.data());
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      settingsUnsub();
+    };
   }, [db]);
 
   const handleAction = async (id: string, action: 'approve' | 'reject') => {
@@ -42,9 +58,27 @@ export default function AdminLeave() {
         link: "/leave"
       });
 
-      toast.success(`Leave request ${action}d successfully`);
     } catch (error) {
       toast.error("Failed to update status");
+      return; // Stop if initial update fails
+    }
+
+    toast.success(`Leave request ${action}d successfully`);
+  };
+
+  const autoApproveLeaves = async (requests: any[]) => {
+    const pendingShortLeaves = requests.filter(r => {
+      const from = new Date(r.from);
+      const to = new Date(r.to);
+      const duration = (to.getTime() - from.getTime()) / (1000 * 3600 * 24) + 1;
+      return r.status === 'pending' && duration < 2;
+    });
+
+    if (pendingShortLeaves.length > 0) {
+      for (const req of pendingShortLeaves) {
+        await handleAction(req.id, 'approve');
+      }
+      toast.info(`${pendingShortLeaves.length} short leave(s) auto-approved.`);
     }
   };
 

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
-import { getFirestore, collection, addDoc, serverTimestamp, query, where, orderBy, onSnapshot, doc } from "firebase/firestore";
+import { getFirestore, collection, addDoc, serverTimestamp, query, where, orderBy, onSnapshot, doc, getDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -113,6 +113,13 @@ export default function Leave() {
         createdAt: serverTimestamp(),
         link: "/admin/leave"
       });
+
+      // Check settings before sending email
+      const settingsSnap = await getDoc(doc(db, "settings", "general"));
+      if (settingsSnap.exists() && settingsSnap.data().emailNotifications) {
+        // The logic to send email was here, but it was reverted.
+        // If re-enabled, it should be wrapped in this condition.
+      }
 
       toast.success("Leave request submitted!", {
         description: "Your request will be reviewed by HR",

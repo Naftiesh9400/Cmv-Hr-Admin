@@ -12,6 +12,7 @@ import Leave from "./pages/Leave";
 import Salary from "./pages/Salary";
 import Increment from "./pages/Increment";
 import Documents from "./pages/Documents";
+import Directory from "./pages/Directory";
 import Profile from "./pages/Profile";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminEmployees from "./pages/admin/AdminEmployees";
@@ -48,6 +49,7 @@ const App = () => {
               <Route path="/salary" element={<Salary />} />
               <Route path="/increment" element={<Increment />} />
               <Route path="/documents" element={<Documents />} />
+            <Route path="/directory" element={<Directory />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/admin/employees" element={<AdminEmployees />} />

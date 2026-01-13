@@ -3,6 +3,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { BirthdayWidget } from "@/components/dashboard/BirthdayWidget";
 import { WorkAnniversaryWidget } from "@/components/dashboard/WorkAnniversaryWidget";
+import { HolidaysWidget } from "@/components/dashboard/HolidaysWidget";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { ClockWidget } from "@/components/dashboard/ClockWidget";
 import { AttendanceChart } from "@/components/dashboard/AttendanceChart";
@@ -142,6 +143,7 @@ export default function Dashboard() {
           <div className="space-y-6">
             <ClockWidget onWorkHoursChange={setTodayHours} />
             <QuickActions />
+            <HolidaysWidget />
           </div>
         </div>
 

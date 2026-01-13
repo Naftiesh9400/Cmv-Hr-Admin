@@ -38,6 +38,7 @@ export function Sidebar({ isAdmin = false }: SidebarProps) {
     { icon: IndianRupee, label: "Salary", path: "/salary" },
     { icon: TrendingUp, label: "Increment", path: "/increment" },
     { icon: FileText, label: "Documents", path: "/documents" },
+    { icon: Users, label: "Directory", path: "/directory" },
     { icon: User, label: "Profile", path: "/profile" },
   ];
 

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { signInWithPopup, signInWithEmailAndPassword, signOut } from "firebase/auth";
-import { getFirestore, doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { getFirestore, doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { auth, googleProvider } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +41,17 @@ export default function Login() {
       return;
     }
 
+    // Maintenance Mode Check
+    const adminEmails = ["help@cmv-global.com"];
+    if (!adminEmails.includes(email)) {
+      const settingsSnap = await getDoc(doc(db, "settings", "general"));
+      if (settingsSnap.exists() && settingsSnap.data().maintenanceMode) {
+        toast.error("The system is currently under maintenance. Please try again later.");
+        setIsLoading(false);
+        return;
+      }
+    }
+
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
       const user = result.user;
@@ -56,8 +67,6 @@ export default function Login() {
       toast.success(`Welcome back, ${user.displayName || user.email}!`);
       
       navigate("/dashboard");
-      // Admin check for specific emails
-      const adminEmails = ["help@cmv-global.com"];
       if (user.email && adminEmails.includes(user.email)) {
         navigate("/admin");
       } else {
@@ -100,6 +109,18 @@ export default function Login() {
         return;
       }
 
+      // Maintenance Mode Check
+      const adminEmails = ["help@cmv-global.com"];
+      if (user.email && !adminEmails.includes(user.email)) {
+        const settingsSnap = await getDoc(doc(db, "settings", "general"));
+        if (settingsSnap.exists() && settingsSnap.data().maintenanceMode) {
+          await signOut(auth);
+          toast.error("The system is currently under maintenance. Please try again later.");
+          setIsLoading(false);
+          return;
+        }
+      }
+
       await setDoc(doc(db, "users", user.uid), {
         email: user.email,
         displayName: user.displayName || user.email?.split('@')[0],
@@ -111,7 +132,6 @@ export default function Login() {
       toast.success(`Welcome, ${user.displayName}!`);
       
       navigate("/dashboard");
-      const adminEmails = ["help@cmv-global.com"];
       if (user.email && adminEmails.includes(user.email)) {
         navigate("/admin");
       } else {

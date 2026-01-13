@@ -42,6 +42,7 @@ export function Sidebar({ isAdmin = false }: SidebarProps) {
     { icon: Users, label: "Directory", path: "/directory" },
     { icon: Network, label: "Org Chart", path: "/org-chart" },
     { icon: User, label: "Profile", path: "/profile" },
+    { icon: LogOut, label: "Resignation", path: "/resignation" },
   ];
 
   const adminNavItems = [
@@ -52,6 +53,7 @@ export function Sidebar({ isAdmin = false }: SidebarProps) {
     { icon: IndianRupee, label: "Payroll", path: "/admin/payroll" },
     { icon: FileText, label: "Documents", path: "/admin/documents" },
     { icon: TrendingUp, label: "Increments", path: "/admin/increments" },
+    { icon: LogOut, label: "Resignations", path: "/admin/resignations" },
     { icon: Building2, label: "Organization", path: "/admin/organization" },
     { icon: Shield, label: "Roles & Access", path: "/admin/roles" },
     { icon: Bell, label: "Notifications", path: "/admin/notifications" },

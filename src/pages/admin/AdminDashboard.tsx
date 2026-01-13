@@ -68,6 +68,7 @@ export default function AdminDashboard() {
   const [recentEmployees, setRecentEmployees] = useState<any[]>([]);
   const [pendingLeaves, setPendingLeaves] = useState<any[]>([]);
   const [pendingIncrements, setPendingIncrements] = useState<any[]>([]);
+  const [pendingResignations, setPendingResignations] = useState<any[]>([]);
 
   useEffect(() => {
     const hour = new Date().getHours();
@@ -151,17 +152,24 @@ export default function AdminDashboard() {
       setPendingIncrements(snapshot.docs.map(doc => ({ id: doc.id, type: 'increment', ...doc.data() })));
     });
 
+    // 5. Fetch Resignations (Pending)
+    const resignationsQuery = query(collection(db, "resignations"), where("status", "==", "pending"));
+    const unsubscribeResignations = onSnapshot(resignationsQuery, (snapshot) => {
+      setPendingResignations(snapshot.docs.map(doc => ({ id: doc.id, type: 'resignation', ...doc.data() })));
+    });
+
     return () => {
       unsubscribeUsers();
       unsubscribeAttendance();
       unsubscribeLeaves();
       unsubscribeIncrements();
+      unsubscribeResignations();
     };
   }, [db]);
 
   // Combine pending requests and calculate absent count
   useEffect(() => {
-    const allPending = [...pendingLeaves, ...pendingIncrements].sort((a, b) => {
+    const allPending = [...pendingLeaves, ...pendingIncrements, ...pendingResignations].sort((a, b) => {
       const dateA = a.createdAt ? a.createdAt.toDate() : new Date();
       const dateB = b.createdAt ? b.createdAt.toDate() : new Date();
       return dateB.getTime() - dateA.getTime();
@@ -179,7 +187,7 @@ export default function AdminDashboard() {
       if (item.name === "Absent") return { ...item, count: absent };
       return item;
     }));
-  }, [pendingLeaves, pendingIncrements, stats.totalEmployees, todayAttendance[0].count, todayAttendance[1].count, todayAttendance[3].count]);
+  }, [pendingLeaves, pendingIncrements, pendingResignations, stats.totalEmployees, todayAttendance[0].count, todayAttendance[1].count, todayAttendance[3].count]);
 
   const handleExport = () => {
     if (recentEmployees.length === 0) {
@@ -399,7 +407,7 @@ export default function AdminDashboard() {
           <StatCard
             title="Pending Requests"
             value={stats.pendingRequests}
-            subtitle="Leave & Increments"
+            subtitle="Leave, Resignations & Increments"
             icon={Calendar}
             variant="warning"
           />
@@ -442,7 +450,9 @@ export default function AdminDashboard() {
                     </Avatar>
                     <div>
                       <p className="font-medium text-foreground">{item.userName || "Unknown User"}</p>
-                      <p className="text-sm text-muted-foreground">{item.type === 'leave' ? `${item.type} - ${item.from}` : `Increment: ${item.expectedAmount}`}</p>
+                      <p className="text-sm text-muted-foreground">{item.type === 'leave' ? `${item.type} - ${item.from}` : 
+                        item.type === 'increment' ? `Increment: ${item.expectedAmount}` :
+                        `Resignation`}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">

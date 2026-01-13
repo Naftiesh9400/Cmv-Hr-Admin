@@ -31,8 +31,9 @@ export default function AdminEmployees() {
     wfh: 0,
     salary: 0,
     performanceScore: 0,
-    performanceTrend: 0
-    dob: ""
+    performanceTrend: 0,
+    dob: "",
+    joinDate: ""
   });
 
   useEffect(() => {
@@ -53,8 +54,9 @@ export default function AdminEmployees() {
       wfh: employee.leaveBalance?.wfh || 0,
       salary: employee.currentSalary || 0,
       performanceScore: employee.performance?.score || 0,
-      performanceTrend: employee.performance?.trend || 0
-      dob: employee.dob || ""
+      performanceTrend: employee.performance?.trend || 0,
+      dob: employee.dob || "",
+      joinDate: employee.joinDate || ""
     });
     setIsDialogOpen(true);
   };
@@ -74,7 +76,8 @@ export default function AdminEmployees() {
           score: Number(formData.performanceScore),
           trend: Number(formData.performanceTrend)
         },
-        dob: formData.dob
+        dob: formData.dob,
+        joinDate: formData.joinDate
       });
       toast.success("Employee stats updated successfully");
       setIsDialogOpen(false);
@@ -153,6 +156,10 @@ export default function AdminEmployees() {
               <div className="space-y-2">
                   <Label htmlFor="edit-dob">Date of Birth</Label>
                   <Input id="edit-dob" type="date" value={formData.dob} onChange={(e) => setFormData({...formData, dob: e.target.value})} />
+              </div>
+              <div className="space-y-2">
+                  <Label htmlFor="edit-joinDate">Joining Date</Label>
+                  <Input id="edit-joinDate" type="date" value={formData.joinDate} onChange={(e) => setFormData({...formData, joinDate: e.target.value})} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="salary">Current Month Net Salary (₹)</Label>

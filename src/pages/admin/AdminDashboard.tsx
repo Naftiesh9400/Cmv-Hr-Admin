@@ -17,8 +17,9 @@ import {
   XCircle,
   UserPlus,
   Download,
+  Gift,
 } from "lucide-react";
-import { getFirestore, collection, query, where, onSnapshot, orderBy, limit, doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { getFirestore, collection, query, where, onSnapshot, orderBy, limit, doc, setDoc, serverTimestamp, addDoc, getDocs, writeBatch } from "firebase/firestore";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import { format, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
@@ -52,6 +53,7 @@ export default function AdminDashboard() {
     displayName: "",
     role: "employee",
     dob: "",
+    joinDate: "",
   });
 
   const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
@@ -209,6 +211,7 @@ export default function AdminDashboard() {
         email: newEmployee.email,
         role: newEmployee.role,
         dob: newEmployee.dob,
+        joinDate: newEmployee.joinDate,
         createdAt: serverTimestamp(),
       });
 
@@ -216,6 +219,74 @@ export default function AdminDashboard() {
       setIsAddEmployeeOpen(false);
     } catch (error: any) {
       toast.error(error.message || "Failed to add employee.");
+    }
+  };
+
+  const sendWishes = async () => {
+    const today = new Date();
+    const todayMonth = today.getMonth();
+    const todayDate = today.getDate();
+    let wishesSent = 0;
+    
+    toast.info("Checking for birthdays and anniversaries...");
+    
+    try {
+      const usersSnapshot = await getDocs(collection(db, "users"));
+      const batch = writeBatch(db);
+      let hasUpdates = false;
+
+      usersSnapshot.forEach((userDoc) => {
+        const userData = userDoc.data();
+        
+        // Check Birthday
+        if (userData.dob) {
+          const dob = new Date(userData.dob);
+          if (dob.getMonth() === todayMonth && dob.getDate() === todayDate) {
+            const newNotifRef = doc(collection(db, "notifications"));
+            batch.set(newNotifRef, {
+              recipientId: "all",
+              title: "Happy Birthday! 🎂",
+              message: `Happy Birthday to ${userData.displayName || "Employee"}!`,
+              read: false,
+              createdAt: serverTimestamp(),
+              type: "system",
+              sendEmail: true // Flag for Cloud Function to send email
+            });
+            wishesSent++;
+            hasUpdates = true;
+          }
+        }
+
+        // Check Anniversary
+        if (userData.joinDate) {
+          const joinDate = new Date(userData.joinDate);
+          if (joinDate.getMonth() === todayMonth && joinDate.getDate() === todayDate && joinDate.getFullYear() < today.getFullYear()) {
+            const years = today.getFullYear() - joinDate.getFullYear();
+            const newNotifRef = doc(collection(db, "notifications"));
+            batch.set(newNotifRef, {
+              recipientId: "all",
+              title: "Work Anniversary! 🎉",
+              message: `Congratulations to ${userData.displayName || "Employee"} on completing ${years} years!`,
+              read: false,
+              createdAt: serverTimestamp(),
+              type: "system",
+              sendEmail: true // Flag for Cloud Function to send email
+            });
+            wishesSent++;
+            hasUpdates = true;
+          }
+        }
+      });
+
+      if (hasUpdates) {
+        await batch.commit();
+        toast.success(`Sent ${wishesSent} automated wishes!`);
+      } else {
+        toast.info("No birthdays or anniversaries found for today.");
+      }
+    } catch (error) {
+      console.error("Error sending wishes:", error);
+      toast.error("Failed to send wishes.");
     }
   };
 
@@ -233,6 +304,10 @@ export default function AdminDashboard() {
             </p>
           </div>
           <div className="flex gap-3">
+            <Button variant="outline" className="gap-2" onClick={sendWishes}>
+              <Gift className="w-4 h-4" />
+              Send Wishes
+            </Button>
             <Button variant="outline" className="gap-2" onClick={handleExport}>
               <Download className="w-4 h-4" />
               Export Report
@@ -259,6 +334,10 @@ export default function AdminDashboard() {
                   <div className="space-y-2">
                     <Label htmlFor="dob">Date of Birth</Label>
                     <Input id="dob" type="date" required onChange={(e) => setNewEmployee({...newEmployee, dob: e.target.value})} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="joinDate">Joining Date</Label>
+                    <Input id="joinDate" type="date" required onChange={(e) => setNewEmployee({...newEmployee, joinDate: e.target.value})} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email">Work Email</Label>

@@ -28,6 +28,15 @@ export default function Dashboard() {
     currentSalary: 0,
     performance: { score: 0, trend: 0 }
   });
+  const [greeting, setGreeting] = useState("Good morning");
+
+  useEffect(() => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 12) setGreeting("Good morning");
+    else if (hour >= 12 && hour < 17) setGreeting("Good afternoon");
+    else if (hour >= 17 && hour < 21) setGreeting("Good evening");
+    else setGreeting("Good night");
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -53,7 +62,7 @@ export default function Dashboard() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="font-display text-2xl sm:text-3xl font-bold text-foreground">
-              Good morning, {displayName}! 👋
+              {greeting}, {displayName}
             </h1>
             <p className="text-muted-foreground mt-1">
               Here's what's happening today

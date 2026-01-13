@@ -29,6 +29,8 @@ export default function Dashboard() {
     performance: { score: 0, trend: 0 }
   });
   const [greeting, setGreeting] = useState("Good morning");
+  const [quote, setQuote] = useState("");
+  const [quoteAuthor, setQuoteAuthor] = useState("");
 
   useEffect(() => {
     const hour = new Date().getHours();
@@ -36,6 +38,21 @@ export default function Dashboard() {
     else if (hour >= 12 && hour < 17) setGreeting("Good afternoon");
     else if (hour >= 17 && hour < 21) setGreeting("Good evening");
     else setGreeting("Good night");
+  }, []);
+
+  useEffect(() => {
+    const fetchQuote = async () => {
+      try {
+        const response = await fetch("https://api.quotable.io/random");
+        const data = await response.json();
+        setQuote(`"${data.content}"`);
+        setQuoteAuthor(`- ${data.author}`);
+      } catch (error) {
+        setQuote("\"The only way to do great work is to love what you do.\"");
+        setQuoteAuthor("- Steve Jobs");
+      }
+    };
+    fetchQuote();
   }, []);
 
   useEffect(() => {
@@ -64,8 +81,11 @@ export default function Dashboard() {
             <h1 className="font-display text-2xl sm:text-3xl font-bold text-foreground">
               {greeting}, {displayName}
             </h1>
-            <p className="text-muted-foreground mt-1">
-              Here's what's happening today
+            <p className="text-muted-foreground mt-2 italic">
+              {quote}
+            </p>
+            <p className="text-sm text-muted-foreground text-right font-medium">
+              {quoteAuthor}
             </p>
           </div>
           <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-success/10 text-success">

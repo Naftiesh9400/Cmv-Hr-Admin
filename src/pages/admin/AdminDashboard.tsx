@@ -46,6 +46,8 @@ export default function AdminDashboard() {
   });
 
   const [greeting, setGreeting] = useState("Good morning");
+  const [quote, setQuote] = useState("");
+  const [quoteAuthor, setQuoteAuthor] = useState("");
   const [isAddEmployeeOpen, setIsAddEmployeeOpen] = useState(false);
   const [newEmployee, setNewEmployee] = useState({
     email: "",
@@ -73,6 +75,21 @@ export default function AdminDashboard() {
     else if (hour >= 12 && hour < 17) setGreeting("Good afternoon");
     else if (hour >= 17 && hour < 21) setGreeting("Good evening");
     else setGreeting("Good night");
+  }, []);
+
+  useEffect(() => {
+    const fetchQuote = async () => {
+      try {
+        const response = await fetch("https://api.quotable.io/random");
+        const data = await response.json();
+        setQuote(`"${data.content}"`);
+        setQuoteAuthor(`- ${data.author}`);
+      } catch (error) {
+        setQuote("\"Leadership is not about being in charge. It is about taking care of those in your charge.\"");
+        setQuoteAuthor("- Simon Sinek");
+      }
+    };
+    fetchQuote();
   }, []);
 
   useEffect(() => {
@@ -301,6 +318,12 @@ export default function AdminDashboard() {
             </h1>
             <p className="text-muted-foreground mt-1">
               Overview of your organization
+            </p>
+            <p className="text-sm text-muted-foreground mt-2 italic">
+              {quote}
+            </p>
+            <p className="text-xs text-muted-foreground text-right font-medium">
+              {quoteAuthor}
             </p>
           </div>
           <div className="flex gap-3">

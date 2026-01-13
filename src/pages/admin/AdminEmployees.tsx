@@ -77,7 +77,7 @@ export default function AdminEmployees() {
           trend: Number(formData.performanceTrend)
         },
         dob: formData.dob,
-        joinDate: formData.joinDate
+        joinDate: formData.joinDate // Ensure joinDate is saved
       });
       toast.success("Employee stats updated successfully");
       setIsDialogOpen(false);

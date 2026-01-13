@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
+import { BirthdayWidget } from "@/components/dashboard/BirthdayWidget";
+import { WorkAnniversaryWidget } from "@/components/dashboard/WorkAnniversaryWidget";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { ClockWidget } from "@/components/dashboard/ClockWidget";
 import { AttendanceChart } from "@/components/dashboard/AttendanceChart";
@@ -75,6 +77,8 @@ export default function Dashboard() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        <BirthdayWidget />
+        <WorkAnniversaryWidget />
         {/* Welcome Section */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>

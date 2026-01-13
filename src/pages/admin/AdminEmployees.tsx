@@ -32,6 +32,7 @@ export default function AdminEmployees() {
     salary: 0,
     performanceScore: 0,
     performanceTrend: 0
+    dob: ""
   });
 
   useEffect(() => {
@@ -53,6 +54,7 @@ export default function AdminEmployees() {
       salary: employee.currentSalary || 0,
       performanceScore: employee.performance?.score || 0,
       performanceTrend: employee.performance?.trend || 0
+      dob: employee.dob || ""
     });
     setIsDialogOpen(true);
   };
@@ -71,7 +73,8 @@ export default function AdminEmployees() {
         performance: {
           score: Number(formData.performanceScore),
           trend: Number(formData.performanceTrend)
-        }
+        },
+        dob: formData.dob
       });
       toast.success("Employee stats updated successfully");
       setIsDialogOpen(false);
@@ -146,6 +149,10 @@ export default function AdminEmployees() {
                   <Label htmlFor="wfh">Work from Home</Label>
                   <Input id="wfh" type="number" value={formData.wfh} onChange={(e) => setFormData({...formData, wfh: Number(e.target.value)})} />
                 </div>
+              </div>
+              <div className="space-y-2">
+                  <Label htmlFor="edit-dob">Date of Birth</Label>
+                  <Input id="edit-dob" type="date" value={formData.dob} onChange={(e) => setFormData({...formData, dob: e.target.value})} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="salary">Current Month Net Salary (₹)</Label>

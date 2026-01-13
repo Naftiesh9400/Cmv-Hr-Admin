@@ -44,12 +44,14 @@ export default function AdminDashboard() {
     monthlyPayroll: 0
   });
 
+  const [greeting, setGreeting] = useState("Good morning");
   const [isAddEmployeeOpen, setIsAddEmployeeOpen] = useState(false);
   const [newEmployee, setNewEmployee] = useState({
     email: "",
     password: "",
     displayName: "",
     role: "employee",
+    dob: "",
   });
 
   const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
@@ -62,6 +64,14 @@ export default function AdminDashboard() {
   const [recentEmployees, setRecentEmployees] = useState<any[]>([]);
   const [pendingLeaves, setPendingLeaves] = useState<any[]>([]);
   const [pendingIncrements, setPendingIncrements] = useState<any[]>([]);
+
+  useEffect(() => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 12) setGreeting("Good morning");
+    else if (hour >= 12 && hour < 17) setGreeting("Good afternoon");
+    else if (hour >= 17 && hour < 21) setGreeting("Good evening");
+    else setGreeting("Good night");
+  }, []);
 
   useEffect(() => {
     // 1. Fetch Users Data (Total Employees, Payroll, Recent Employees)
@@ -198,6 +208,7 @@ export default function AdminDashboard() {
         displayName: newEmployee.displayName,
         email: newEmployee.email,
         role: newEmployee.role,
+        dob: newEmployee.dob,
         createdAt: serverTimestamp(),
       });
 
@@ -215,7 +226,7 @@ export default function AdminDashboard() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="font-display text-2xl sm:text-3xl font-bold text-foreground">
-              Welcome, {user?.displayName || user?.email?.split('@')[0] || "Admin"}
+              {greeting}, {user?.displayName || user?.email?.split('@')[0] || "Admin"}
             </h1>
             <p className="text-muted-foreground mt-1">
               Overview of your organization
@@ -244,6 +255,10 @@ export default function AdminDashboard() {
                   <div className="space-y-2">
                     <Label htmlFor="displayName">Full Name</Label>
                     <Input id="displayName" placeholder="John Doe" required onChange={(e) => setNewEmployee({...newEmployee, displayName: e.target.value})} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="dob">Date of Birth</Label>
+                    <Input id="dob" type="date" required onChange={(e) => setNewEmployee({...newEmployee, dob: e.target.value})} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email">Work Email</Label>

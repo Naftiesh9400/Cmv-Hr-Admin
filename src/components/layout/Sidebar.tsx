@@ -20,6 +20,7 @@ import {
   Users,
   Shield,
   Bell,
+  Network,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -39,6 +40,7 @@ export function Sidebar({ isAdmin = false }: SidebarProps) {
     { icon: TrendingUp, label: "Increment", path: "/increment" },
     { icon: FileText, label: "Documents", path: "/documents" },
     { icon: Users, label: "Directory", path: "/directory" },
+    { icon: Network, label: "Org Chart", path: "/org-chart" },
     { icon: User, label: "Profile", path: "/profile" },
   ];
 

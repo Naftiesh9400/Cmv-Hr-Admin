@@ -7,21 +7,42 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { getFirestore, doc, getDoc, updateDoc, onSnapshot } from "firebase/firestore";
+import { getFirestore, doc, getDoc, updateDoc, onSnapshot, collection, query, orderBy, getDocs } from "firebase/firestore";
 import { getAuth, updateProfile } from "firebase/auth";
 import { toast } from "sonner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function Profile() {
   const { user } = useAuth();
   const db = getFirestore();
   const [loading, setLoading] = useState(false);
+  const [allEmployees, setAllEmployees] = useState<any[]>([]);
 
   const [formData, setFormData] = useState({
     displayName: "",
     phone: "",
     designation: "",
-    photoURL: ""
+    department: "",
+    photoURL: "",
+    status: "Available",
+    reportsTo: ""
   });
+
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      const q = query(collection(db, "users"), orderBy("displayName"));
+      const snapshot = await getDocs(q);
+      const employees = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAllEmployees(employees);
+    };
+    fetchEmployees();
+  }, [db]);
 
   useEffect(() => {
     if (!user) return;
@@ -34,7 +55,10 @@ export default function Profile() {
             displayName: data.displayName || user.displayName || user.email?.split('@')[0] || "",
             phone: data.phone || "",
             designation: data.designation || "Software Engineer",
-            photoURL: data.photoURL || user.photoURL || ""
+            department: data.department || "",
+            photoURL: data.photoURL || user.photoURL || "",
+            status: data.status || "Available",
+            reportsTo: data.reportsTo || ""
           });
         }
       }
@@ -51,7 +75,10 @@ export default function Profile() {
         displayName: formData.displayName,
         phone: formData.phone,
         designation: formData.designation,
+        department: formData.department,
         photoURL: formData.photoURL,
+        status: formData.status,
+        reportsTo: formData.reportsTo
       });
 
       const auth = getAuth();
@@ -147,6 +174,46 @@ export default function Profile() {
                       onChange={(e) => setFormData({...formData, designation: e.target.value})}
                     />
                   </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="department">Department</Label>
+                    <Input 
+                      id="department" 
+                      value={formData.department}
+                      onChange={(e) => setFormData({...formData, department: e.target.value})}
+                      placeholder="e.g. Engineering"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="status">Current Status</Label>
+                    <Select value={formData.status} onValueChange={(val) => setFormData({...formData, status: val})}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Available">Available</SelectItem>
+                        <SelectItem value="In a meeting">In a meeting</SelectItem>
+                        <SelectItem value="On Leave">On Leave</SelectItem>
+                        <SelectItem value="Working Remotely">Working Remotely</SelectItem>
+                        <SelectItem value="Do Not Disturb">Do Not Disturb</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="reportsTo">Reports To</Label>
+                  <Select value={formData.reportsTo} onValueChange={(val) => setFormData({...formData, reportsTo: val})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select manager" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {allEmployees.filter(emp => emp.id !== user?.uid).map((emp) => (
+                        <SelectItem key={emp.id} value={emp.displayName || emp.email}>{emp.displayName || emp.email}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 

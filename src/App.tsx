@@ -13,6 +13,7 @@ import Salary from "./pages/Salary";
 import Increment from "./pages/Increment";
 import Documents from "./pages/Documents";
 import Directory from "./pages/Directory";
+import OrgChart from "./pages/OrgChart";
 import Profile from "./pages/Profile";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminEmployees from "./pages/admin/AdminEmployees";
@@ -50,6 +51,7 @@ const App = () => {
               <Route path="/increment" element={<Increment />} />
               <Route path="/documents" element={<Documents />} />
             <Route path="/directory" element={<Directory />} />
+            <Route path="/org-chart" element={<OrgChart />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/admin/employees" element={<AdminEmployees />} />

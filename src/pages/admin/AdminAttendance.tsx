@@ -92,6 +92,17 @@ export default function AdminAttendance() {
     record.date?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const totalWorkingHours = filteredData.reduce((acc, record) => {
+    if (record.workHours === "-") return acc;
+    const parts = record.workHours.split("h ");
+    if (parts.length !== 2) return acc;
+    const hours = parseInt(parts[0]);
+    const minutes = parseInt(parts[1].replace("m", ""));
+    return acc + hours * 60 + minutes;
+  }, 0);
+
+  const totalHoursDisplay = `${Math.floor(totalWorkingHours / 60)}h ${totalWorkingHours % 60}m`;
+
   const downloadCSV = () => {
     const headers = ["User ID", "Name", "Email", "Date", "Clock In", "Clock Out", "Work Hours", "Location", "IP", "Status"];
     const csvRows = [headers.join(",")];
@@ -136,7 +147,10 @@ export default function AdminAttendance() {
               Monitor employee check-ins and work hours
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            <div className="bg-accent/10 text-accent px-3 py-2 rounded-md text-sm font-medium border border-accent/20 mr-2">
+              Total Hours: {totalHoursDisplay}
+            </div>
             <Button variant="outline" size="sm" onClick={downloadCSV}>
               <FileDown className="w-4 h-4 mr-2" /> Download CSV
             </Button>
@@ -159,6 +173,7 @@ export default function AdminAttendance() {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/50">
+                <TableHead className="w-[60px]">Sr. No</TableHead>
                 <TableHead>User ID</TableHead>
                 <TableHead>Employee</TableHead>
                 <TableHead>Date</TableHead>
@@ -171,8 +186,9 @@ export default function AdminAttendance() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredData.length > 0 ? filteredData.map((record) => (
+              {filteredData.length > 0 ? filteredData.map((record, index) => (
                 <TableRow key={record.id} className="hover:bg-muted/30">
+                  <TableCell className="font-medium text-muted-foreground">{index + 1}</TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">{record.userId}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -206,7 +222,7 @@ export default function AdminAttendance() {
                     <Badge variant="outline" className={record.status === 'present' ? "bg-success/10 text-success border-success/20" : "bg-warning/10 text-warning border-warning/20"}>{record.status}</Badge>
                   </TableCell>
                 </TableRow>
-              )) : <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">No attendance records found</TableCell></TableRow>}
+              )) : <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">No attendance records found</TableCell></TableRow>}
             </TableBody>
           </Table>
         </div>

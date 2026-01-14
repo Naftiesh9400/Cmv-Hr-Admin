@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { signInWithPopup, signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { signInWithPopup, signInWithEmailAndPassword, signOut, sendPasswordResetEmail } from "firebase/auth";
 import { getFirestore, doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { auth, googleProvider } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,30 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const db = getFirestore();
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      toast.error("Please enter your email address first.");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      toast.success("Password reset email sent. Check your inbox.");
+    } catch (error: any) {
+      console.error("Password reset error:", error);
+      let errorMessage = "Failed to send password reset email.";
+      if (error.code === "auth/user-not-found") {
+        errorMessage = "No account found with this email.";
+      } else if (error.code === "auth/invalid-email") {
+        errorMessage = "Invalid email address.";
+      }
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -337,7 +361,12 @@ export default function Login() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Password</Label>
-                <Button variant="link" className="px-0 h-auto text-sm">
+                <Button 
+                  type="button"
+                  variant="link" 
+                  className="px-0 h-auto text-sm"
+                  onClick={handleForgotPassword}
+                >
                   Forgot password?
                 </Button>
               </div>

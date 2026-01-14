@@ -24,9 +24,10 @@ import {
 
 interface SidebarProps {
   isAdmin?: boolean;
+  hasAdminAccess?: boolean;
 }
 
-export function Sidebar({ isAdmin = false }: SidebarProps) {
+export function Sidebar({ isAdmin = false, hasAdminAccess = false }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
 
@@ -60,7 +61,16 @@ export function Sidebar({ isAdmin = false }: SidebarProps) {
     { icon: Gavel, label: "Company Policy", path: "/policy" },
   ];
 
-  const navItems = isAdmin ? adminNavItems : employeeNavItems;
+  const navItems: any[] = isAdmin ? [...adminNavItems] : [...employeeNavItems];
+
+  if (hasAdminAccess) {
+    navItems.push({ separator: true });
+    if (isAdmin) {
+      navItems.push({ icon: LayoutDashboard, label: "Employee View", path: "/dashboard" });
+    } else {
+      navItems.push({ icon: Shield, label: "Admin View", path: "/admin" });
+    }
+  }
 
   return (
     <aside
@@ -86,7 +96,10 @@ export function Sidebar({ isAdmin = false }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-        {navItems.map((item) => {
+        {navItems.map((item, index) => {
+          if (item.separator) {
+            return <div key={`sep-${index}`} className="my-2 border-t border-sidebar-border opacity-50" />;
+          }
           const isActive = location.pathname === item.path;
           return (
             <Link

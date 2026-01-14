@@ -20,10 +20,6 @@ export default function AdminLeave() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const requests = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setLeaveRequests(requests);
-      // Auto-approve logic can be triggered here
-      if (settings.autoApproveLeave) {
-        autoApproveLeaves(requests);
-      }
     });
 
     const settingsUnsub = onSnapshot(doc(db, "settings", "general"), (doc) => {
@@ -37,6 +33,12 @@ export default function AdminLeave() {
       settingsUnsub();
     };
   }, [db]);
+
+  useEffect(() => {
+    if (settings.autoApproveLeave && leaveRequests.length > 0) {
+      autoApproveLeaves(leaveRequests);
+    }
+  }, [leaveRequests, settings]);
 
   const handleAction = async (id: string, action: 'approve' | 'reject') => {
     const request = leaveRequests.find(r => r.id === id);

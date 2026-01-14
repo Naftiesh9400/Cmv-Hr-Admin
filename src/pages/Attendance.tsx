@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { addDays, format } from "date-fns";
+import { addDays, format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isToday, addMonths, subMonths } from "date-fns";
 import { DateRange } from "react-day-picker";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import {
@@ -59,6 +59,8 @@ export default function Attendance() {
   });
   const [statusFilter, setStatusFilter] = useState("all");
   const [attendanceData, setAttendanceData] = useState<any[]>([]);
+  const [leaves, setLeaves] = useState<any[]>([]);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
 
   useEffect(() => {
     const fetchAttendance = async () => {
@@ -96,6 +98,15 @@ export default function Attendance() {
       }
     };
     fetchAttendance();
+  }, [user, db]);
+
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, "leaves"), where("userId", "==", user.uid));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setLeaves(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsubscribe();
   }, [user, db]);
 
   const filteredData = useMemo(() => {
@@ -209,6 +220,59 @@ export default function Attendance() {
     document.body.removeChild(a);
   };
 
+  const getDayStatus = (date: Date) => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    const attendance = attendanceData.find(a => a.date === dateStr);
+    const leave = leaves.find(l => {
+      const start = new Date(l.from);
+      const end = new Date(l.to);
+      return date >= start && date <= end && (l.status === 'Approved' || l.status === 'approved');
+    });
+
+    let color = "bg-destructive/10 text-destructive border-destructive/20"; // Default Absent (Red)
+    let reason = "Absent";
+    
+    // Check for Holiday (Sunday)
+    if (getDay(date) === 0) {
+      color = "bg-orange-100 text-orange-700 border-orange-200";
+      reason = "Holiday";
+    }
+
+    // Check Attendance
+    if (attendance) {
+      if (attendance.status === 'present') {
+        color = "bg-success/10 text-success border-success/20";
+        reason = "Present";
+      } else if (attendance.status === 'late') {
+        color = "bg-warning/10 text-warning border-warning/20";
+        reason = "Late";
+      }
+    }
+
+    // Check Leave (Overrides absent/holiday if approved)
+    if (leave) {
+      color = "bg-success/10 text-success border-success/20"; // Green as requested
+      reason = `On Leave: ${leave.reason}`;
+    }
+
+    // Future dates
+    if (date > new Date()) {
+      color = "bg-muted/50 text-muted-foreground border-muted";
+      reason = "";
+    }
+
+    return { color, reason };
+  };
+
+  const calendarDays = useMemo(() => {
+    const start = startOfMonth(currentMonth);
+    const end = endOfMonth(currentMonth);
+    const days = eachDayOfInterval({ start, end });
+    const startDay = getDay(start); // 0 is Sunday
+    const padding = Array(startDay).fill(null);
+    return [...padding, ...days];
+  }, [currentMonth]);
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -249,6 +313,40 @@ export default function Attendance() {
           <div className="p-4 rounded-xl bg-accent/10 border border-accent/20">
             <p className="text-sm text-muted-foreground">Total Hours</p>
             <p className="text-2xl font-bold font-display text-accent">{totalWorkHours}</p>
+          </div>
+        </div>
+
+        {/* Calendar View */}
+        <div className="rounded-xl border bg-card shadow-card p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="font-display font-semibold text-lg">Attendance Calendar</h3>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <span className="font-medium min-w-[100px] text-center">{format(currentMonth, "MMMM yyyy")}</span>
+              <Button variant="outline" size="sm" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-7 gap-2 mb-2">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+              <div key={day} className="text-center text-sm font-medium text-muted-foreground py-2">{day}</div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-2">
+            {calendarDays.map((date, i) => {
+              if (!date) return <div key={`pad-${i}`} className="h-24" />;
+              const { color, reason } = getDayStatus(date);
+              return (
+                <div key={date.toISOString()} className={`h-24 border rounded-lg p-2 flex flex-col justify-between transition-colors hover:opacity-80 ${color}`} title={reason}>
+                  <span className={`text-sm font-medium ${isToday(date) ? 'bg-primary text-primary-foreground w-6 h-6 rounded-full flex items-center justify-center' : ''}`}>{format(date, 'd')}</span>
+                  {reason && <span className="text-xs truncate font-medium">{reason}</span>}
+                </div>
+              );
+            })}
           </div>
         </div>
 

@@ -69,10 +69,19 @@ export default function Login() {
     const adminEmails = ["help@cmv-global.com", "design@cmv-global.com", "design@elevatemyskill.com"];
     if (!adminEmails.includes(email)) {
       const settingsSnap = await getDoc(doc(db, "settings", "general"));
-      if (settingsSnap.exists() && settingsSnap.data().maintenanceMode) {
-        toast.error("The system is currently under maintenance. Please try again later.");
-        setIsLoading(false);
-        return;
+      if (settingsSnap.exists()) {
+        const settings = settingsSnap.data();
+        if (settings.maintenanceMode) {
+          toast.error("The system is currently under maintenance. Please try again later.");
+          setIsLoading(false);
+          return;
+        }
+        const today = new Date().getDay();
+        if ((today === 0 || today === 6) && !settings.allowWeekendAccess) {
+          toast.error("Weekend access is currently disabled.");
+          setIsLoading(false);
+          return;
+        }
       }
     }
 
@@ -150,11 +159,21 @@ export default function Login() {
       const adminEmails = ["help@cmv-global.com", "design@cmv-global.com", "design@elevatemyskill.com"];
       if (user.email && !adminEmails.includes(user.email)) {
         const settingsSnap = await getDoc(doc(db, "settings", "general"));
-        if (settingsSnap.exists() && settingsSnap.data().maintenanceMode) {
-          await signOut(auth);
-          toast.error("The system is currently under maintenance. Please try again later.");
-          setIsLoading(false);
-          return;
+        if (settingsSnap.exists()) {
+          const settings = settingsSnap.data();
+          if (settings.maintenanceMode) {
+            await signOut(auth);
+            toast.error("The system is currently under maintenance. Please try again later.");
+            setIsLoading(false);
+            return;
+          }
+          const today = new Date().getDay();
+          if ((today === 0 || today === 6) && !settings.allowWeekendAccess) {
+            await signOut(auth);
+            toast.error("Weekend access is currently disabled.");
+            setIsLoading(false);
+            return;
+          }
         }
       }
 

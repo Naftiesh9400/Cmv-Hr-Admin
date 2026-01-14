@@ -103,6 +103,10 @@ export default function Leave() {
         createdAt: serverTimestamp()
       });
 
+      // Check settings for email notifications
+      const settingsSnap = await getDoc(doc(db, "settings", "general"));
+      const shouldSendEmail = settingsSnap.exists() && settingsSnap.data().emailNotifications;
+
       // Notify Admin
       await addDoc(collection(db, "notifications"), {
         recipientId: "admin",
@@ -111,15 +115,9 @@ export default function Leave() {
         type: "leave",
         read: false,
         createdAt: serverTimestamp(),
-        link: "/admin/leave"
+        link: "/admin/leave",
+        sendEmail: shouldSendEmail
       });
-
-      // Check settings before sending email
-      const settingsSnap = await getDoc(doc(db, "settings", "general"));
-      if (settingsSnap.exists() && settingsSnap.data().emailNotifications) {
-        // The logic to send email was here, but it was reverted.
-        // If re-enabled, it should be wrapped in this condition.
-      }
 
       toast.success("Leave request submitted!", {
         description: "Your request will be reviewed by HR",

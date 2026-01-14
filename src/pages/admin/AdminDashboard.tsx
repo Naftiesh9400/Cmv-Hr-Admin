@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -12,12 +13,10 @@ import {
   Calendar,
   IndianRupee,
   TrendingUp,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
   UserPlus,
   Download,
   Gift,
+  LogOut,
 } from "lucide-react";
 import { getFirestore, collection, query, where, onSnapshot, orderBy, limit, doc, setDoc, serverTimestamp, addDoc, getDocs, writeBatch } from "firebase/firestore";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
@@ -33,10 +32,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { AttendanceTrendChart } from "./AttendanceTrendChart";
 
 export default function AdminDashboard() {
   const { user } = useAuth();
   const db = getFirestore();
+  const navigate = useNavigate();
 
   const [stats, setStats] = useState({
     totalEmployees: 0,
@@ -389,7 +390,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
           <StatCard
             title="Total Employees"
             value={stats.totalEmployees}
@@ -412,6 +413,15 @@ export default function AdminDashboard() {
             variant="warning"
           />
           <StatCard
+            title="Resignations"
+            value={pendingResignations.length}
+            subtitle="Pending Approval"
+            icon={LogOut}
+            variant="destructive"
+            className="cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => navigate("/admin/resignations")}
+          />
+          <StatCard
             title="Monthly Payroll"
             value={`₹${(stats.monthlyPayroll / 1000).toFixed(1)}K`}
             trend={{ value: 12, isPositive: true }}
@@ -420,58 +430,13 @@ export default function AdminDashboard() {
           />
         </div>
 
+        {/* Attendance Trend Chart */}
+        <AttendanceTrendChart />
+
         {/* Main Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Pending Approvals */}
-          <div className="lg:col-span-2 rounded-xl border bg-card shadow-card">
-            <div className="p-4 border-b flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-warning" />
-                <h3 className="font-display font-semibold text-lg">
-                  Pending Approvals
-                </h3>
-              </div>
-              <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">
-                {pendingApprovals.length} pending
-              </Badge>
-            </div>
-            <div className="divide-y">
-              {pendingApprovals.length > 0 ? pendingApprovals.map((item) => (
-                <div
-                  key={item.id}
-                  className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors"
-                >
-                  <div className="flex items-center gap-4">
-                    <Avatar>
-                      <AvatarImage src={item.photoURL} />
-                      <AvatarFallback className="bg-primary/10 text-primary">
-                        {item.userName?.substring(0, 2).toUpperCase() || "US"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium text-foreground">{item.userName || "Unknown User"}</p>
-                      <p className="text-sm text-muted-foreground">{item.type === 'leave' ? `${item.type} - ${item.from}` : 
-                        item.type === 'increment' ? `Increment: ${item.expectedAmount}` :
-                        `Resignation`}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground mr-2">
-                      {item.createdAt ? formatDistanceToNow(item.createdAt.toDate(), { addSuffix: true }) : 'Just now'}
-                    </span>
-                    <Button size="sm" variant="ghost" className="text-success hover:bg-success/10">
-                      <CheckCircle className="w-4 h-4" />
-                    </Button>
-                    <Button size="sm" variant="ghost" className="text-destructive hover:bg-destructive/10">
-                      <XCircle className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              )) : (
-                <div className="p-4 text-center text-muted-foreground text-sm">No pending approvals</div>
-              )}
-            </div>
-          </div>
+          <PendingApprovals approvals={pendingApprovals} />
 
           {/* Today's Attendance */}
           <div className="rounded-xl border bg-card shadow-card">

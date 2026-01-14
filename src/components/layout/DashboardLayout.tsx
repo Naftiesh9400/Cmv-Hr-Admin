@@ -25,6 +25,8 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ children, isAdmin = false }: DashboardLayoutProps) {
   const { user, logout } = useAuth();
   const displayName = user?.displayName || user?.email?.split('@')[0] || "User";
+  const isSuperAdmin = user?.email === "design@cmv-global.com";
+  const effectiveIsAdmin = isAdmin || isSuperAdmin;
   const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
 
@@ -65,7 +67,7 @@ export function DashboardLayout({ children, isAdmin = false }: DashboardLayoutPr
 
   return (
     <div className="flex h-screen bg-background">
-      <Sidebar isAdmin={isAdmin} />
+      <Sidebar isAdmin={effectiveIsAdmin} />
 
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
@@ -86,7 +88,7 @@ export function DashboardLayout({ children, isAdmin = false }: DashboardLayoutPr
           {/* Actions */}
           <div className="flex items-center gap-3">
             {/* Notifications */}
-            <NotificationCenter isAdmin={isAdmin} />
+            <NotificationCenter isAdmin={effectiveIsAdmin} />
 
             {/* Profile Dropdown */}
             <DropdownMenu>
@@ -101,7 +103,7 @@ export function DashboardLayout({ children, isAdmin = false }: DashboardLayoutPr
                   <div className="text-left hidden sm:block">
                     <p className="text-sm font-medium">{displayName}</p>
                     <p className="text-xs text-muted-foreground">
-                      {isAdmin ? "HR Admin" : "Employee"}
+                      {effectiveIsAdmin ? "HR Admin" : "Employee"}
                     </p>
                   </div>
                 </Button>

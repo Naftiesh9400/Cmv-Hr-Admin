@@ -3,7 +3,6 @@ import { Link, useLocation } from "react-router-dom";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard,
   Clock,
@@ -21,6 +20,7 @@ import {
   Shield,
   Bell,
   Network,
+  Star,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -28,7 +28,6 @@ interface SidebarProps {
 }
 
 export function Sidebar({ isAdmin = false }: SidebarProps) {
-  const { user } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
 
@@ -42,6 +41,7 @@ export function Sidebar({ isAdmin = false }: SidebarProps) {
     { icon: Users, label: "Directory", path: "/directory" },
     { icon: Network, label: "Org Chart", path: "/org-chart" },
     { icon: User, label: "Profile", path: "/profile" },
+    { icon: Star, label: "Performance", path: "/performance" },
     { icon: LogOut, label: "Resignation", path: "/resignation" },
   ];
 
@@ -53,6 +53,7 @@ export function Sidebar({ isAdmin = false }: SidebarProps) {
     { icon: IndianRupee, label: "Payroll", path: "/admin/payroll" },
     { icon: FileText, label: "Documents", path: "/admin/documents" },
     { icon: TrendingUp, label: "Increments", path: "/admin/increments" },
+    { icon: Star, label: "Performance", path: "/admin/performance" },
     { icon: LogOut, label: "Resignations", path: "/admin/resignations" },
     { icon: Building2, label: "Organization", path: "/admin/organization" },
     { icon: Shield, label: "Roles & Access", path: "/admin/roles" },
@@ -60,12 +61,7 @@ export function Sidebar({ isAdmin = false }: SidebarProps) {
     { icon: Settings, label: "Settings", path: "/admin/settings" },
   ];
 
-  const dualRoleEmails = ["design@elevatemyskill.com", "help@cmv-global.com"];
-  const isDualRole = user?.email && dualRoleEmails.includes(user.email);
-
-  const navItems = isAdmin 
-    ? (isDualRole ? [...adminNavItems, { icon: LayoutDashboard, label: "Employee View", path: "/dashboard" }] : adminNavItems)
-    : (isDualRole ? [...employeeNavItems, { icon: Shield, label: "Admin View", path: "/admin" }] : employeeNavItems);
+  const navItems = isAdmin ? adminNavItems : employeeNavItems;
 
   return (
     <aside

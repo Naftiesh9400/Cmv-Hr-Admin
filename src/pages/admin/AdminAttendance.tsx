@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Clock, Calendar as CalendarIcon, Search, FileDown } from "lucide-react";
+import { Clock, Calendar as CalendarIcon, Search, FileDown, MapPin, Globe } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -23,14 +23,34 @@ export default function AdminAttendance() {
         const querySnapshot = await getDocs(q);
         const data = querySnapshot.docs.map(doc => {
           const d = doc.data();
-          const clockIn = d.clockIn ? d.clockIn.toDate() : null;
-          const clockOut = d.clockOut ? d.clockOut.toDate() : null;
           
+          let firstClockIn = null;
+          let lastClockOut = null;
+          let totalMs = 0;
+
+          if (d.sessions && Array.isArray(d.sessions) && d.sessions.length > 0) {
+            const firstSession = d.sessions[0];
+            firstClockIn = firstSession.clockIn ? firstSession.clockIn.toDate() : null;
+            
+            const lastSession = d.sessions[d.sessions.length - 1];
+            lastClockOut = lastSession.clockOut ? lastSession.clockOut.toDate() : null;
+
+            d.sessions.forEach((s: any) => {
+              if (s.clockIn && s.clockOut) {
+                totalMs += s.clockOut.toDate().getTime() - s.clockIn.toDate().getTime();
+              }
+            });
+          } else {
+            // Fallback for legacy data
+            firstClockIn = d.clockIn ? d.clockIn.toDate() : null;
+            lastClockOut = d.clockOut ? d.clockOut.toDate() : null;
+            if (firstClockIn && lastClockOut) totalMs = lastClockOut.getTime() - firstClockIn.getTime();
+          }
+
           let workHours = "-";
-          if (clockIn && clockOut) {
-            const diff = clockOut.getTime() - clockIn.getTime();
-            const hours = Math.floor(diff / (1000 * 60 * 60));
-            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+          if (totalMs > 0) {
+            const hours = Math.floor(totalMs / (1000 * 60 * 60));
+            const minutes = Math.floor((totalMs % (1000 * 60 * 60)) / (1000 * 60));
             workHours = `${hours}h ${minutes}m`;
           }
 
@@ -38,9 +58,11 @@ export default function AdminAttendance() {
             id: doc.id,
             userId: d.userId,
             date: d.date,
-            clockIn: clockIn ? format(clockIn, "hh:mm a") : "-",
-            clockOut: clockOut ? format(clockOut, "hh:mm a") : "-",
+            clockIn: firstClockIn ? format(firstClockIn, "hh:mm a") : "-",
+            clockOut: lastClockOut ? format(lastClockOut, "hh:mm a") : "-",
             workHours,
+            location: d.location || "Unknown",
+            ip: d.ip || "Unknown",
             status: d.status || "absent"
           };
         });
@@ -58,17 +80,19 @@ export default function AdminAttendance() {
   );
 
   const downloadCSV = () => {
-    const headers = ["User ID", "Date", "Clock In", "Clock Out", "Work Hours", "Status"];
+    const headers = ["User ID", "Date", "Clock In", "Clock Out", "Work Hours", "Location", "IP", "Status"];
     const csvRows = [headers.join(",")];
 
     for (const record of filteredData) {
       const values = [
-      record.userId,
-      record.date,
-      record.clockIn,
-      record.clockOut,
-      record.workHours,
-      record.status
+        record.userId,
+        record.date,
+        record.clockIn,
+        record.clockOut,
+        record.workHours,
+        record.location,
+        record.ip,
+        record.status
       ];
       csvRows.push(values.join(","));
     }
@@ -125,6 +149,8 @@ export default function AdminAttendance() {
                 <TableHead>Clock In</TableHead>
                 <TableHead>Clock Out</TableHead>
                 <TableHead>Duration</TableHead>
+                <TableHead>Location</TableHead>
+                <TableHead>IP Address</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
@@ -146,10 +172,20 @@ export default function AdminAttendance() {
                   <TableCell>{record.clockOut}</TableCell>
                   <TableCell className="font-medium">{record.workHours}</TableCell>
                   <TableCell>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground" title={record.location}>
+                      <MapPin className="w-3 h-3" /> {record.location.substring(0, 15)}{record.location.length > 15 ? '...' : ''}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Globe className="w-3 h-3" /> {record.ip}
+                    </div>
+                  </TableCell>
+                  <TableCell>
                     <Badge variant="outline" className={record.status === 'present' ? "bg-success/10 text-success border-success/20" : "bg-warning/10 text-warning border-warning/20"}>{record.status}</Badge>
                   </TableCell>
                 </TableRow>
-              )) : <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No attendance records found</TableCell></TableRow>}
+              )) : <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No attendance records found</TableCell></TableRow>}
             </TableBody>
           </Table>
         </div>

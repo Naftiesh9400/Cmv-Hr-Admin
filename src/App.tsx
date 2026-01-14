@@ -1,6 +1,4 @@
-import { useEffect } from "react";
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
@@ -15,62 +13,66 @@ import Documents from "./pages/Documents";
 import Directory from "./pages/Directory";
 import OrgChart from "./pages/OrgChart";
 import Profile from "./pages/Profile";
+import Performance from "./pages/Performance";
+import Resignation from "./pages/Resignation";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminEmployees from "./pages/admin/AdminEmployees";
 import AdminAttendance from "./pages/admin/AdminAttendance";
 import AdminLeave from "./pages/admin/AdminLeave";
 import AdminPayroll from "./pages/admin/AdminPayroll";
+import AdminDocuments from "./pages/admin/AdminDocuments";
 import AdminIncrements from "./pages/admin/AdminIncrements";
+import AdminPerformance from "./pages/admin/AdminPerformance";
+import AdminResignations from "./pages/admin/AdminResignations";
 import AdminOrganization from "./pages/admin/AdminOrganization";
 import AdminRoles from "./pages/admin/AdminRoles";
 import AdminNotifications from "./pages/admin/AdminNotifications";
 import AdminSettings from "./pages/admin/AdminSettings";
-import AdminDocuments from "./pages/admin/AdminDocuments";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-const App = () => {
-  useEffect(() => {
-    document.title = "CMV Cloud HR";
-  }, []);
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <Toaster />
+      <BrowserRouter>
         <AuthProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Login />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/attendance" element={<Attendance />} />
-              <Route path="/leave" element={<Leave />} />
-              <Route path="/salary" element={<Salary />} />
-              <Route path="/increment" element={<Increment />} />
-              <Route path="/documents" element={<Documents />} />
+          <Routes>
+            <Route path="/" element={<Login />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/attendance" element={<Attendance />} />
+            <Route path="/leave" element={<Leave />} />
+            <Route path="/salary" element={<Salary />} />
+            <Route path="/increment" element={<Increment />} />
+            <Route path="/documents" element={<Documents />} />
             <Route path="/directory" element={<Directory />} />
             <Route path="/org-chart" element={<OrgChart />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/admin" element={<AdminDashboard />} />
-              <Route path="/admin/employees" element={<AdminEmployees />} />
-              <Route path="/admin/attendance" element={<AdminAttendance />} />
-              <Route path="/admin/leave" element={<AdminLeave />} />
-              <Route path="/admin/payroll" element={<AdminPayroll />} />
-              <Route path="/admin/increments" element={<AdminIncrements />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/performance" element={<Performance />} />
+            <Route path="/resignation" element={<Resignation />} />
+            
+            {/* Admin Routes */}
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/employees" element={<AdminEmployees />} />
+            <Route path="/admin/attendance" element={<AdminAttendance />} />
+            <Route path="/admin/leave" element={<AdminLeave />} />
+            <Route path="/admin/payroll" element={<AdminPayroll />} />
+            <Route path="/admin/documents" element={<AdminDocuments />} />
+            <Route path="/admin/increments" element={<AdminIncrements />} />
+            <Route path="/admin/performance" element={<AdminPerformance />} />
+            <Route path="/admin/resignations" element={<AdminResignations />} />
             <Route path="/admin/organization" element={<AdminOrganization />} />
             <Route path="/admin/roles" element={<AdminRoles />} />
             <Route path="/admin/notifications" element={<AdminNotifications />} />
             <Route path="/admin/settings" element={<AdminSettings />} />
-            <Route path="/admin/documents" element={<AdminDocuments />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
+            
+            <Route path="*" element={<NotFound />} />
+          </Routes>
         </AuthProvider>
-      </TooltipProvider>
-    </QueryClientProvider>
-  );
-};
+      </BrowserRouter>
+    </TooltipProvider>
+  </QueryClientProvider>
+);
 
 export default App;

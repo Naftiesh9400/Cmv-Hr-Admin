@@ -159,6 +159,7 @@ export default function AdminAttendance() {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/50">
+                <TableHead>User ID</TableHead>
                 <TableHead>Employee</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Clock In</TableHead>
@@ -172,6 +173,7 @@ export default function AdminAttendance() {
             <TableBody>
               {filteredData.length > 0 ? filteredData.map((record) => (
                 <TableRow key={record.id} className="hover:bg-muted/30">
+                  <TableCell className="font-mono text-xs text-muted-foreground">{record.userId}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <Avatar className="w-8 h-8 border">
@@ -204,7 +206,7 @@ export default function AdminAttendance() {
                     <Badge variant="outline" className={record.status === 'present' ? "bg-success/10 text-success border-success/20" : "bg-warning/10 text-warning border-warning/20"}>{record.status}</Badge>
                   </TableCell>
                 </TableRow>
-              )) : <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No attendance records found</TableCell></TableRow>}
+              )) : <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">No attendance records found</TableCell></TableRow>}
             </TableBody>
           </Table>
         </div>

@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Clock, Calendar as CalendarIcon, Search, FileDown, MapPin, Globe } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -18,6 +18,13 @@ export default function AdminAttendance() {
   useEffect(() => {
     const fetchAllAttendance = async () => {
       try {
+        // Fetch users to map names and emails
+        const usersSnap = await getDocs(collection(db, "users"));
+        const usersMap: Record<string, any> = {};
+        usersSnap.forEach(doc => {
+          usersMap[doc.id] = doc.data();
+        });
+
         // In a real app, you'd likely want pagination here
         const q = query(collection(db, "attendance"), orderBy("date", "desc"), limit(50));
         const querySnapshot = await getDocs(q);
@@ -25,6 +32,7 @@ export default function AdminAttendance() {
           const d = doc.data();
           
           let firstClockIn = null;
+          const userData = usersMap[d.userId] || {};
           let lastClockOut = null;
           let totalMs = 0;
 
@@ -57,6 +65,9 @@ export default function AdminAttendance() {
           return {
             id: doc.id,
             userId: d.userId,
+            userName: userData.displayName || d.userName || "Unknown",
+            userEmail: userData.email || "",
+            userAvatar: userData.photoURL,
             date: d.date,
             clockIn: firstClockIn ? format(firstClockIn, "hh:mm a") : "-",
             clockOut: lastClockOut ? format(lastClockOut, "hh:mm a") : "-",
@@ -76,16 +87,20 @@ export default function AdminAttendance() {
 
   const filteredData = attendanceData.filter(record =>
     record.userId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    record.userName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    record.userEmail?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     record.date?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const downloadCSV = () => {
-    const headers = ["User ID", "Date", "Clock In", "Clock Out", "Work Hours", "Location", "IP", "Status"];
+    const headers = ["User ID", "Name", "Email", "Date", "Clock In", "Clock Out", "Work Hours", "Location", "IP", "Status"];
     const csvRows = [headers.join(",")];
 
     for (const record of filteredData) {
       const values = [
         record.userId,
+        record.userName,
+        record.userEmail,
         record.date,
         record.clockIn,
         record.clockOut,
@@ -132,7 +147,7 @@ export default function AdminAttendance() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Search by User ID or Date (YYYY-MM-DD)..."
+              placeholder="Search by Name, Email or Date..."
               className="pl-9 bg-background"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -159,12 +174,16 @@ export default function AdminAttendance() {
                 <TableRow key={record.id} className="hover:bg-muted/30">
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <Avatar className="w-8 h-8">
+                      <Avatar className="w-8 h-8 border">
+                        <AvatarImage src={record.userAvatar} />
                         <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                          {record.userId.substring(0, 2).toUpperCase()}
+                          {record.userName.substring(0, 2).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
-                      <span className="text-sm font-medium">User {record.userId.substring(0, 5)}...</span>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium">{record.userName}</span>
+                        <span className="text-xs text-muted-foreground">{record.userEmail}</span>
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell className="flex items-center gap-2"><CalendarIcon className="w-3 h-3 text-muted-foreground" /> {record.date}</TableCell>

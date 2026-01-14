@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { getFirestore, doc, getDoc } from "firebase/firestore";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -24,9 +25,20 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ children, isAdmin = false }: DashboardLayoutProps) {
   const { user, logout } = useAuth();
+  const db = getFirestore();
+  const [dbRole, setDbRole] = useState("");
+
+  useEffect(() => {
+    if (user) {
+      getDoc(doc(db, "users", user.uid)).then(snap => {
+        if (snap.exists()) setDbRole(snap.data().role);
+      });
+    }
+  }, [user, db]);
+
   const displayName = user?.displayName || user?.email?.split('@')[0] || "User";
-  const isSuperAdmin = user?.email === "design@cmv-global.com";
-  const effectiveIsAdmin = isAdmin || isSuperAdmin;
+  const isSuperAdmin = ["design@cmv-global.com", "help@cmv-global.com", "design@elevatemyskill.com"].includes(user?.email || "");
+  const effectiveIsAdmin = isAdmin || isSuperAdmin || dbRole === "admin";
   const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
 

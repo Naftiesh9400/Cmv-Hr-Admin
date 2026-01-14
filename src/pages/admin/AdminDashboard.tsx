@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { AttendanceTrendChart } from "./AttendanceTrendChart";
+import { PendingApprovals } from "@/components/dashboard/PendingApprovals";
 
 export default function AdminDashboard() {
   const { user } = useAuth();
@@ -412,15 +413,15 @@ export default function AdminDashboard() {
             icon={Calendar}
             variant="warning"
           />
-          <StatCard
-            title="Resignations"
-            value={pendingResignations.length}
-            subtitle="Pending Approval"
-            icon={LogOut}
-            variant="destructive"
-            className="cursor-pointer hover:opacity-80 transition-opacity"
-            onClick={() => navigate("/admin/resignations")}
-          />
+          <div className="cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigate("/admin/resignations")}>
+            <StatCard
+              title="Resignations"
+              value={pendingResignations.length}
+              subtitle="Pending Approval"
+              icon={LogOut}
+              variant="warning"
+            />
+          </div>
           <StatCard
             title="Monthly Payroll"
             value={`₹${(stats.monthlyPayroll / 1000).toFixed(1)}K`}

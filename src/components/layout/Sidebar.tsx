@@ -15,11 +15,10 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  Building2,
+  Gavel,
   Users,
   Shield,
   Bell,
-  Network,
   Star,
 } from "lucide-react";
 
@@ -39,10 +38,10 @@ export function Sidebar({ isAdmin = false }: SidebarProps) {
     { icon: TrendingUp, label: "Increment", path: "/increment" },
     { icon: FileText, label: "Documents", path: "/documents" },
     { icon: Users, label: "Directory", path: "/directory" },
-    { icon: Network, label: "Org Chart", path: "/org-chart" },
     { icon: User, label: "Profile", path: "/profile" },
     { icon: Star, label: "Performance", path: "/performance" },
     { icon: LogOut, label: "Resignation", path: "/resignation" },
+    { icon: Gavel, label: "Company Policy", path: "/policy" },
   ];
 
   const adminNavItems = [
@@ -55,10 +54,10 @@ export function Sidebar({ isAdmin = false }: SidebarProps) {
     { icon: TrendingUp, label: "Increments", path: "/admin/increments" },
     { icon: Star, label: "Performance", path: "/admin/performance" },
     { icon: LogOut, label: "Resignations", path: "/admin/resignations" },
-    { icon: Building2, label: "Organization", path: "/admin/organization" },
     { icon: Shield, label: "Roles & Access", path: "/admin/roles" },
     { icon: Bell, label: "Notifications", path: "/admin/notifications" },
     { icon: Settings, label: "Settings", path: "/admin/settings" },
+    { icon: Gavel, label: "Company Policy", path: "/policy" },
   ];
 
   const navItems = isAdmin ? adminNavItems : employeeNavItems;

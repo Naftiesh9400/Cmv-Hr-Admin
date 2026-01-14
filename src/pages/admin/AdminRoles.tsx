@@ -10,6 +10,7 @@ import { toast } from "sonner";
 export default function AdminRoles() {
   const db = getFirestore();
   const [users, setUsers] = useState<any[]>([]);
+  const [roleFilter, setRoleFilter] = useState("all");
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "users"), (snap) => {
@@ -27,12 +28,30 @@ export default function AdminRoles() {
     }
   };
 
+  const filteredUsers = users.filter(user => {
+    if (roleFilter === "all") return true;
+    return (user.role || "employee") === roleFilter;
+  });
+
   return (
     <DashboardLayout isAdmin>
       <div className="space-y-6">
-        <div>
-          <h1 className="font-display text-2xl sm:text-3xl font-bold text-foreground">Roles & Access</h1>
-          <p className="text-muted-foreground mt-1">Manage user permissions and roles</p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="font-display text-2xl sm:text-3xl font-bold text-foreground">Roles & Access</h1>
+            <p className="text-muted-foreground mt-1">Manage user permissions and roles</p>
+          </div>
+          <Select value={roleFilter} onValueChange={setRoleFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filter by Role" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Users</SelectItem>
+              <SelectItem value="admin">Admins</SelectItem>
+              <SelectItem value="hr">HR</SelectItem>
+              <SelectItem value="employee">Employees</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="rounded-xl border bg-card shadow-card overflow-hidden">
@@ -46,7 +65,7 @@ export default function AdminRoles() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((user) => (
+              {filteredUsers.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">

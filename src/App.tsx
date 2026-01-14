@@ -11,10 +11,10 @@ import Salary from "./pages/Salary";
 import Increment from "./pages/Increment";
 import Documents from "./pages/Documents";
 import Directory from "./pages/Directory";
-import OrgChart from "./pages/OrgChart";
 import Profile from "./pages/Profile";
 import Performance from "./pages/Performance";
 import Resignation from "./pages/Resignation";
+import CompanyPolicy from "./pages/CompanyPolicy";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminEmployees from "./pages/admin/AdminEmployees";
 import AdminAttendance from "./pages/admin/AdminAttendance";
@@ -24,7 +24,6 @@ import AdminDocuments from "./pages/admin/AdminDocuments";
 import AdminIncrements from "./pages/admin/AdminIncrements";
 import AdminPerformance from "./pages/admin/AdminPerformance";
 import AdminResignations from "./pages/admin/AdminResignations";
-import AdminOrganization from "./pages/admin/AdminOrganization";
 import AdminRoles from "./pages/admin/AdminRoles";
 import AdminNotifications from "./pages/admin/AdminNotifications";
 import AdminSettings from "./pages/admin/AdminSettings";
@@ -47,10 +46,10 @@ const App = () => (
             <Route path="/increment" element={<Increment />} />
             <Route path="/documents" element={<Documents />} />
             <Route path="/directory" element={<Directory />} />
-            <Route path="/org-chart" element={<OrgChart />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/performance" element={<Performance />} />
             <Route path="/resignation" element={<Resignation />} />
+            <Route path="/policy" element={<CompanyPolicy />} />
             
             {/* Admin Routes */}
             <Route path="/admin" element={<AdminDashboard />} />
@@ -62,7 +61,6 @@ const App = () => (
             <Route path="/admin/increments" element={<AdminIncrements />} />
             <Route path="/admin/performance" element={<AdminPerformance />} />
             <Route path="/admin/resignations" element={<AdminResignations />} />
-            <Route path="/admin/organization" element={<AdminOrganization />} />
             <Route path="/admin/roles" element={<AdminRoles />} />
             <Route path="/admin/notifications" element={<AdminNotifications />} />
             <Route path="/admin/settings" element={<AdminSettings />} />

@@ -42,7 +42,7 @@ export default function Login() {
     }
 
     // Maintenance Mode Check
-    const adminEmails = ["help@cmv-global.com"];
+    const adminEmails = ["help@cmv-global.com", "design@cmv-global.com", "design@elevatemyskill.com"];
     if (!adminEmails.includes(email)) {
       const settingsSnap = await getDoc(doc(db, "settings", "general"));
       if (settingsSnap.exists() && settingsSnap.data().maintenanceMode) {
@@ -56,18 +56,31 @@ export default function Login() {
       const result = await signInWithEmailAndPassword(auth, email, password);
       const user = result.user;
       
-      await setDoc(doc(db, "users", user.uid), {
-        email: user.email,
-        displayName: user.displayName || user.email?.split('@')[0],
-        photoURL: user.photoURL,
-        lastLogin: serverTimestamp(),
-        role: "employee"
-      }, { merge: true });
+      const userDocRef = doc(db, "users", user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+      let role = "employee";
+
+      if (userDocSnap.exists()) {
+        role = userDocSnap.data().role || "employee";
+        await setDoc(userDocRef, {
+          lastLogin: serverTimestamp(),
+          email: user.email,
+          displayName: user.displayName || user.email?.split('@')[0],
+          photoURL: user.photoURL,
+        }, { merge: true });
+      } else {
+        await setDoc(userDocRef, {
+          email: user.email,
+          displayName: user.displayName || user.email?.split('@')[0],
+          photoURL: user.photoURL,
+          lastLogin: serverTimestamp(),
+          role: "employee"
+        });
+      }
 
       toast.success(`Welcome back, ${user.displayName || user.email}!`);
       
-      navigate("/dashboard");
-      if (user.email && adminEmails.includes(user.email)) {
+      if ((user.email && adminEmails.includes(user.email)) || role === "admin") {
         navigate("/admin");
       } else {
         navigate("/dashboard");
@@ -110,7 +123,7 @@ export default function Login() {
       }
 
       // Maintenance Mode Check
-      const adminEmails = ["help@cmv-global.com"];
+      const adminEmails = ["help@cmv-global.com", "design@cmv-global.com", "design@elevatemyskill.com"];
       if (user.email && !adminEmails.includes(user.email)) {
         const settingsSnap = await getDoc(doc(db, "settings", "general"));
         if (settingsSnap.exists() && settingsSnap.data().maintenanceMode) {
@@ -121,18 +134,31 @@ export default function Login() {
         }
       }
 
-      await setDoc(doc(db, "users", user.uid), {
-        email: user.email,
-        displayName: user.displayName || user.email?.split('@')[0],
-        photoURL: user.photoURL,
-        lastLogin: serverTimestamp(),
-        role: "employee"
-      }, { merge: true });
+      const userDocRef = doc(db, "users", user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+      let role = "employee";
+
+      if (userDocSnap.exists()) {
+        role = userDocSnap.data().role || "employee";
+        await setDoc(userDocRef, {
+          lastLogin: serverTimestamp(),
+          email: user.email,
+          displayName: user.displayName || user.email?.split('@')[0],
+          photoURL: user.photoURL,
+        }, { merge: true });
+      } else {
+        await setDoc(userDocRef, {
+          email: user.email,
+          displayName: user.displayName || user.email?.split('@')[0],
+          photoURL: user.photoURL,
+          lastLogin: serverTimestamp(),
+          role: "employee"
+        });
+      }
 
       toast.success(`Welcome, ${user.displayName}!`);
       
-      navigate("/dashboard");
-      if (user.email && adminEmails.includes(user.email)) {
+      if ((user.email && adminEmails.includes(user.email)) || role === "admin") {
         navigate("/admin");
       } else {
         navigate("/dashboard");

@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
-import { BirthdayWidget } from "@/components/dashboard/BirthdayWidget";
 import { WorkAnniversaryWidget } from "@/components/dashboard/WorkAnniversaryWidget";
 import { HolidaysWidget } from "@/components/dashboard/HolidaysWidget";
 import { StatCard } from "@/components/dashboard/StatCard";
@@ -18,7 +17,8 @@ import {
   AlertTriangle,
   Pencil,
 } from "lucide-react";
-import { getFirestore, doc, onSnapshot } from "firebase/firestore";
+import { getFirestore, doc, onSnapshot, collection, getDocs } from "firebase/firestore";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -34,6 +34,7 @@ export default function Dashboard() {
   const [greeting, setGreeting] = useState("Good morning");
   const [quote, setQuote] = useState("");
   const [quoteAuthor, setQuoteAuthor] = useState("");
+  const [birthdays, setBirthdays] = useState<any[]>([]);
 
   useEffect(() => {
     const hour = new Date().getHours();
@@ -91,6 +92,29 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
+    const fetchBirthdays = async () => {
+      const today = new Date();
+      const month = today.getMonth();
+      const date = today.getDate();
+      
+      try {
+        const snap = await getDocs(collection(db, "users"));
+        const bdays = snap.docs
+          .map(doc => doc.data())
+          .filter((u: any) => {
+            if (!u.dob) return false;
+            const d = new Date(u.dob);
+            return d.getMonth() === month && d.getDate() === date;
+          });
+        setBirthdays(bdays);
+      } catch (error) {
+        console.error("Error fetching birthdays:", error);
+      }
+    };
+    fetchBirthdays();
+  }, [db]);
+
+  useEffect(() => {
     if (!user) return;
     const unsubscribe = onSnapshot(doc(db, "users", user.uid), (doc) => {
       if (doc.exists()) {
@@ -110,7 +134,35 @@ export default function Dashboard() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <BirthdayWidget />
+        {birthdays.length > 0 && (
+          <div className="w-full bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-pink-500/10 border border-pink-500/20 p-1 rounded-xl overflow-hidden relative">
+             <div className="flex items-center gap-8 animate-marquee whitespace-nowrap py-2">
+               {birthdays.map((u, i) => (
+                 <div key={i} className="flex items-center gap-3 px-4">
+                    <Avatar className="w-8 h-8 border-2 border-pink-200">
+                      <AvatarImage src={u.photoURL} />
+                      <AvatarFallback>{u.displayName?.[0]}</AvatarFallback>
+                    </Avatar>
+                    <span className="font-medium text-pink-700 dark:text-pink-300">
+                      Happy Birthday, {u.displayName}! 🎂
+                    </span>
+                 </div>
+               ))}
+             </div>
+             <style>{`
+               @keyframes marquee {
+                 0% { transform: translateX(100%); }
+                 100% { transform: translateX(-100%); }
+               }
+               .animate-marquee {
+                 animation: marquee 20s linear infinite;
+               }
+               .animate-marquee:hover {
+                 animation-play-state: paused;
+               }
+             `}</style>
+          </div>
+        )}
         <WorkAnniversaryWidget />
         {/* Welcome Section */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

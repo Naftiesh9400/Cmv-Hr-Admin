@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { getFirestore, collection, query, where, getDocs } from "firebase/firestore";
+import { getFirestore, collection, query, where, getDocs, onSnapshot } from "firebase/firestore";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -33,6 +33,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import { toast } from "sonner";
 
 const statusStyles = {
   present: "bg-success/10 text-success border-success/20",
@@ -61,6 +62,7 @@ export default function Attendance() {
   const [attendanceData, setAttendanceData] = useState<any[]>([]);
   const [leaves, setLeaves] = useState<any[]>([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [holidays, setHolidays] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchAttendance = async () => {
@@ -108,6 +110,13 @@ export default function Attendance() {
     });
     return () => unsubscribe();
   }, [user, db]);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "holidays"), (snapshot) => {
+      setHolidays(snapshot.docs.map(doc => doc.data()));
+    });
+    return () => unsubscribe();
+  }, [db]);
 
   const filteredData = useMemo(() => {
     let data = attendanceData;
@@ -220,6 +229,13 @@ export default function Attendance() {
     document.body.removeChild(a);
   };
 
+  const getHolidayName = (date: Date) => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    const holiday = holidays.find(h => h.date === dateStr);
+    if (holiday) return holiday.name;
+    return null;
+  };
+
   const getDayStatus = (date: Date) => {
     const dateStr = format(date, "yyyy-MM-dd");
     const attendance = attendanceData.find(a => a.date === dateStr);
@@ -232,10 +248,11 @@ export default function Attendance() {
     let color = "bg-destructive/10 text-destructive border-destructive/20"; // Default Absent (Red)
     let reason = "Absent";
     
-    // Check for Holiday (Sunday)
-    if (getDay(date) === 0) {
+    // Check for Holiday (Sunday or Special Day)
+    const holidayName = getHolidayName(date);
+    if (getDay(date) === 0 || holidayName) {
       color = "bg-orange-100 text-orange-700 border-orange-200";
-      reason = "Holiday";
+      reason = holidayName || "Holiday";
     }
 
     // Check Attendance
@@ -341,7 +358,12 @@ export default function Attendance() {
               if (!date) return <div key={`pad-${i}`} className="h-24" />;
               const { color, reason } = getDayStatus(date);
               return (
-                <div key={date.toISOString()} className={`h-24 border rounded-lg p-2 flex flex-col justify-between transition-colors hover:opacity-80 ${color}`} title={reason}>
+                <div 
+                  key={date.toISOString()} 
+                  className={`h-24 border rounded-lg p-2 flex flex-col justify-between transition-colors hover:opacity-80 cursor-pointer ${color}`} 
+                  title={reason}
+                  onClick={() => reason && toast.info(reason)}
+                >
                   <span className={`text-sm font-medium ${isToday(date) ? 'bg-primary text-primary-foreground w-6 h-6 rounded-full flex items-center justify-center' : ''}`}>{format(date, 'd')}</span>
                   {reason && <span className="text-xs truncate font-medium">{reason}</span>}
                 </div>

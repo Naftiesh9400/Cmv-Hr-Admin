@@ -18,7 +18,7 @@ import {
   Gift,
   LogOut,
 } from "lucide-react";
-import { getFirestore, collection, query, where, onSnapshot, orderBy, limit, doc, setDoc, serverTimestamp, addDoc, getDocs, writeBatch } from "firebase/firestore";
+import { getFirestore, collection, query, where, onSnapshot, orderBy, limit, doc, setDoc, serverTimestamp, addDoc, getDocs, writeBatch, getDoc } from "firebase/firestore";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import { format, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
@@ -82,14 +82,46 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const fetchQuote = async () => {
+      const today = new Date().toDateString();
+      const storedQuoteData = localStorage.getItem("dailyQuote");
+
+      if (storedQuoteData) {
+        const { date, quote, author } = JSON.parse(storedQuoteData);
+        if (date === today) {
+          setQuote(quote);
+          setQuoteAuthor(author);
+          return;
+        }
+      }
+
       try {
-        const response = await fetch("https://api.quotable.io/random");
+        const response = await fetch("https://api.quotable.io/random?tags=motivational");
         const data = await response.json();
-        setQuote(`"${data.content}"`);
-        setQuoteAuthor(`- ${data.author}`);
+        const newQuote = `"${data.content}"`;
+        const newAuthor = `- ${data.author}`;
+        setQuote(newQuote);
+        setQuoteAuthor(newAuthor);
+        localStorage.setItem("dailyQuote", JSON.stringify({
+          date: today,
+          quote: newQuote,
+          author: newAuthor
+        }));
       } catch (error) {
-        setQuote("\"Leadership is not about being in charge. It is about taking care of those in your charge.\"");
-        setQuoteAuthor("- Simon Sinek");
+        const fallbackQuotes = [
+          { text: "Leadership is not about being in charge. It is about taking care of those in your charge.", author: "Simon Sinek" },
+          { text: "Innovation distinguishes between a leader and a follower.", author: "Steve Jobs" },
+          { text: "The greatest leader is not necessarily the one who does the greatest things. He is the one that gets the people to do the greatest things.", author: "Ronald Reagan" },
+          { text: "To handle yourself, use your head; to handle others, use your heart.", author: "Eleanor Roosevelt" },
+          { text: "A leader is one who knows the way, goes the way, and shows the way.", author: "John C. Maxwell" }
+        ];
+        const randomFallback = fallbackQuotes[Math.floor(Math.random() * fallbackQuotes.length)];
+        setQuote(`"${randomFallback.text}"`);
+        setQuoteAuthor(`- ${randomFallback.author}`);
+        localStorage.setItem("dailyQuote", JSON.stringify({
+          date: today,
+          quote: `"${randomFallback.text}"`,
+          author: `- ${randomFallback.author}`
+        }));
       }
     };
     fetchQuote();
@@ -249,15 +281,20 @@ export default function AdminDashboard() {
     }
   };
 
-  const sendWishes = async () => {
+  const sendWishes = async (isAuto = false) => {
     const today = new Date();
     const todayMonth = today.getMonth();
     const todayDate = today.getDate();
     let wishesSent = 0;
     
-    toast.info("Checking for birthdays and anniversaries...");
+    if (!isAuto) toast.info("Checking for birthdays and anniversaries...");
     
     try {
+      const settingsSnap = await getDoc(doc(db, "settings", "general"));
+      const settings = settingsSnap.exists() ? settingsSnap.data() : {};
+      const birthdayTemplate = settings.birthdayMessage || "Happy Birthday to {name}! 🎂";
+      const anniversaryTemplate = settings.workAnniversaryMessage || "Congratulations to {name} on completing {years} years! 🎉";
+
       const usersSnapshot = await getDocs(collection(db, "users"));
       const batch = writeBatch(db);
       let hasUpdates = false;
@@ -269,11 +306,12 @@ export default function AdminDashboard() {
         if (userData.dob) {
           const dob = new Date(userData.dob);
           if (dob.getMonth() === todayMonth && dob.getDate() === todayDate) {
+            const message = birthdayTemplate.replace("{name}", userData.displayName || "Employee");
             const newNotifRef = doc(collection(db, "notifications"));
             batch.set(newNotifRef, {
               recipientId: "all",
               title: "Happy Birthday! 🎂",
-              message: `Happy Birthday to ${userData.displayName || "Employee"}!`,
+              message: message,
               read: false,
               createdAt: serverTimestamp(),
               type: "system",
@@ -289,11 +327,14 @@ export default function AdminDashboard() {
           const joinDate = new Date(userData.joinDate);
           if (joinDate.getMonth() === todayMonth && joinDate.getDate() === todayDate && joinDate.getFullYear() < today.getFullYear()) {
             const years = today.getFullYear() - joinDate.getFullYear();
+            const message = anniversaryTemplate
+              .replace("{name}", userData.displayName || "Employee")
+              .replace("{years}", years.toString());
             const newNotifRef = doc(collection(db, "notifications"));
             batch.set(newNotifRef, {
               recipientId: "all",
               title: "Work Anniversary! 🎉",
-              message: `Congratulations to ${userData.displayName || "Employee"} on completing ${years} years!`,
+              message: message,
               read: false,
               createdAt: serverTimestamp(),
               type: "system",
@@ -307,15 +348,38 @@ export default function AdminDashboard() {
 
       if (hasUpdates) {
         await batch.commit();
-        toast.success(`Sent ${wishesSent} automated wishes!`);
+        if (!isAuto) toast.success(`Sent ${wishesSent} automated wishes!`);
       } else {
-        toast.info("No birthdays or anniversaries found for today.");
+        if (!isAuto) toast.info("No birthdays or anniversaries found for today.");
       }
     } catch (error) {
       console.error("Error sending wishes:", error);
-      toast.error("Failed to send wishes.");
+      if (!isAuto) toast.error("Failed to send wishes.");
     }
   };
+
+  useEffect(() => {
+    const checkAutoWishes = async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const taskRef = doc(db, "system", "daily_tasks");
+      
+      try {
+        const taskSnap = await getDoc(taskRef);
+        if (!taskSnap.exists() || taskSnap.data().lastWishesSent !== today) {
+          await sendWishes(true);
+          await setDoc(taskRef, { lastWishesSent: today }, { merge: true });
+        }
+      } catch (error) {
+        // Fallback to local storage if system collection is not accessible
+        const localSent = localStorage.getItem("lastWishesSent");
+        if (localSent !== today) {
+           await sendWishes(true);
+           localStorage.setItem("lastWishesSent", today);
+        }
+      }
+    };
+    checkAutoWishes();
+  }, [db]);
 
   return (
     <DashboardLayout isAdmin>
@@ -337,7 +401,7 @@ export default function AdminDashboard() {
             </p>
           </div>
           <div className="flex gap-3">
-            <Button variant="outline" className="gap-2" onClick={sendWishes}>
+            <Button variant="outline" className="gap-2" onClick={() => sendWishes(false)}>
               <Gift className="w-4 h-4" />
               Send Wishes
             </Button>

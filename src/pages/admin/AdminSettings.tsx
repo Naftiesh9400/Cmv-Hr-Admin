@@ -14,14 +14,16 @@ export default function AdminSettings() {
     maintenanceMode: false,
     allowWeekendAccess: false,
     emailNotifications: true,
-    autoApproveLeave: false
+    autoApproveLeave: false,
+    birthdayMessage: "",
+    workAnniversaryMessage: ""
   });
 
   useEffect(() => {
     const fetchSettings = async () => {
       const snap = await getDoc(doc(db, "settings", "general"));
       if (snap.exists()) {
-        setSettings(snap.data() as any);
+        setSettings(prev => ({ ...prev, ...snap.data() }));
       }
     };
     fetchSettings();
@@ -81,6 +83,26 @@ export default function AdminSettings() {
                 <p className="text-sm text-muted-foreground">Automatically approve leave requests under 2 days</p>
               </div>
               <Switch checked={settings.autoApproveLeave} onCheckedChange={() => handleToggle('autoApproveLeave')} />
+            </div>
+
+            <div className="space-y-2 pt-4 border-t">
+              <Label>Birthday Message Template</Label>
+              <Input 
+                value={settings.birthdayMessage || ""} 
+                onChange={(e) => setSettings({...settings, birthdayMessage: e.target.value})}
+                placeholder="Happy Birthday to {name}! 🎂"
+              />
+              <p className="text-xs text-muted-foreground">Use {'{name}'} as a placeholder for employee name.</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Work Anniversary Message Template</Label>
+              <Input 
+                value={settings.workAnniversaryMessage || ""} 
+                onChange={(e) => setSettings({...settings, workAnniversaryMessage: e.target.value})}
+                placeholder="Congratulations to {name} on completing {years} years! 🎉"
+              />
+              <p className="text-xs text-muted-foreground">Use {'{name}'} for name and {'{years}'} for number of years.</p>
             </div>
 
             <div className="pt-4">

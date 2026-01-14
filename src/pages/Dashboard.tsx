@@ -45,14 +45,46 @@ export default function Dashboard() {
 
   useEffect(() => {
     const fetchQuote = async () => {
+      const today = new Date().toDateString();
+      const storedQuoteData = localStorage.getItem("dailyQuote");
+
+      if (storedQuoteData) {
+        const { date, quote, author } = JSON.parse(storedQuoteData);
+        if (date === today) {
+          setQuote(quote);
+          setQuoteAuthor(author);
+          return;
+        }
+      }
+
       try {
-        const response = await fetch("https://api.quotable.io/random");
+        const response = await fetch("https://api.quotable.io/random?tags=motivational");
         const data = await response.json();
-        setQuote(`"${data.content}"`);
-        setQuoteAuthor(`- ${data.author}`);
+        const newQuote = `"${data.content}"`;
+        const newAuthor = `- ${data.author}`;
+        setQuote(newQuote);
+        setQuoteAuthor(newAuthor);
+        localStorage.setItem("dailyQuote", JSON.stringify({
+          date: today,
+          quote: newQuote,
+          author: newAuthor
+        }));
       } catch (error) {
-        setQuote("\"The only way to do great work is to love what you do.\"");
-        setQuoteAuthor("- Steve Jobs");
+        const fallbackQuotes = [
+          { text: "The only way to do great work is to love what you do.", author: "Steve Jobs" },
+          { text: "Believe you can and you're halfway there.", author: "Theodore Roosevelt" },
+          { text: "Your time is limited, don't waste it living someone else's life.", author: "Steve Jobs" },
+          { text: "The future belongs to those who believe in the beauty of their dreams.", author: "Eleanor Roosevelt" },
+          { text: "Don't watch the clock; do what it does. Keep going.", author: "Sam Levenson" }
+        ];
+        const randomFallback = fallbackQuotes[Math.floor(Math.random() * fallbackQuotes.length)];
+        setQuote(`"${randomFallback.text}"`);
+        setQuoteAuthor(`- ${randomFallback.author}`);
+        localStorage.setItem("dailyQuote", JSON.stringify({
+          date: today,
+          quote: `"${randomFallback.text}"`,
+          author: `- ${randomFallback.author}`
+        }));
       }
     };
     fetchQuote();

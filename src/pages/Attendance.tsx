@@ -57,6 +57,7 @@ export default function Attendance() {
     from: addDays(new Date(), -30),
     to: new Date(),
   });
+  const [statusFilter, setStatusFilter] = useState("all");
   const [attendanceData, setAttendanceData] = useState<any[]>([]);
 
   useEffect(() => {
@@ -81,6 +82,7 @@ export default function Attendance() {
 
           return {
             date: d.date,
+            userName: user.displayName || d.userName || "Employee",
             day: dateObj.toLocaleDateString('en-US', { weekday: 'long' }),
             clockIn: clockIn ? clockIn.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "-",
             clockOut: clockOut ? clockOut.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "-",
@@ -97,9 +99,10 @@ export default function Attendance() {
   }, [user, db]);
 
   const filteredData = useMemo(() => {
-    if (!dateRange?.from) return attendanceData;
+    let data = attendanceData;
     
-    return attendanceData.filter(record => {
+    if (dateRange?.from) {
+      data = data.filter(record => {
       const recordDate = new Date(record.date);
       recordDate.setHours(0, 0, 0, 0);
       
@@ -110,8 +113,15 @@ export default function Attendance() {
       to.setHours(23, 59, 59, 999);
       
       return recordDate >= from && recordDate <= to;
-    });
-  }, [attendanceData, dateRange]);
+      });
+    }
+
+    if (statusFilter !== "all") {
+      data = data.filter(record => record.status === statusFilter);
+    }
+
+    return data;
+  }, [attendanceData, dateRange, statusFilter]);
 
   const chartData = useMemo(() => {
     // Create a copy and reverse to show chronological order (oldest to newest)
@@ -151,15 +161,34 @@ export default function Attendance() {
     return `${h}h ${m}m`;
   }, [filteredData]);
 
+  const totalWorkHours = useMemo(() => {
+    const validRecords = filteredData.filter((r) => r.workHours !== "-");
+    if (validRecords.length === 0) return "-";
+
+    const totalMinutes = validRecords.reduce((acc, record) => {
+      const parts = record.workHours.split("h ");
+      if (parts.length !== 2) return acc;
+      const hours = parseInt(parts[0]);
+      const minutes = parseInt(parts[1].replace("m", ""));
+      return acc + hours * 60 + minutes;
+    }, 0);
+
+    const h = Math.floor(totalMinutes / 60);
+    const m = Math.round(totalMinutes % 60);
+
+    return `${h}h ${m}m`;
+  }, [filteredData]);
+
   const handleExportCSV = () => {
     if (!filteredData.length) return;
 
-    const headers = ["Date", "Day", "Clock In", "Clock Out", "Work Hours", "Status"];
+    const headers = ["Date", "Employee", "Day", "Clock In", "Clock Out", "Work Hours", "Status"];
     const csvRows = [headers.join(",")];
 
     for (const row of filteredData) {
       const values = [
         row.date,
+        row.userName,
         row.day,
         row.clockIn,
         row.clockOut,
@@ -200,7 +229,7 @@ export default function Attendance() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
           <div className="p-4 rounded-xl bg-success/10 border border-success/20">
             <p className="text-sm text-muted-foreground">Present Days</p>
             <p className="text-2xl font-bold font-display text-success">{filteredData.filter(d => d.status === 'present').length}</p>
@@ -216,6 +245,10 @@ export default function Attendance() {
           <div className="p-4 rounded-xl bg-primary/10 border border-primary/20">
             <p className="text-sm text-muted-foreground">Avg. Hours/Day</p>
             <p className="text-2xl font-bold font-display text-primary">{averageWorkHours}</p>
+          </div>
+          <div className="p-4 rounded-xl bg-accent/10 border border-accent/20">
+            <p className="text-sm text-muted-foreground">Total Hours</p>
+            <p className="text-2xl font-bold font-display text-accent">{totalWorkHours}</p>
           </div>
         </div>
 
@@ -277,7 +310,7 @@ export default function Attendance() {
             </PopoverContent>
           </Popover>
 
-          <Select>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-[150px]">
               <Filter className="w-4 h-4 mr-2" />
               <SelectValue placeholder="Status" />
@@ -298,6 +331,7 @@ export default function Attendance() {
             <TableHeader>
               <TableRow className="bg-muted/50">
                 <TableHead>Date</TableHead>
+                <TableHead>Employee</TableHead>
                 <TableHead>Day</TableHead>
                 <TableHead>Clock In</TableHead>
                 <TableHead>Clock Out</TableHead>
@@ -309,6 +343,7 @@ export default function Attendance() {
               {filteredData.map((record) => (
                 <TableRow key={record.date} className="hover:bg-muted/30">
                   <TableCell className="font-medium">{record.date}</TableCell>
+                  <TableCell>{record.userName}</TableCell>
                   <TableCell>{record.day}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">

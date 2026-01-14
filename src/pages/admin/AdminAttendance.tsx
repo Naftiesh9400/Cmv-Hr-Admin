@@ -175,7 +175,8 @@ export default function AdminAttendance() {
               <TableRow className="bg-muted/50">
                 <TableHead className="w-[60px]">Sr. No</TableHead>
                 <TableHead>User ID</TableHead>
-                <TableHead>Employee</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Clock In</TableHead>
                 <TableHead>Clock Out</TableHead>
@@ -198,12 +199,10 @@ export default function AdminAttendance() {
                           {record.userName.substring(0, 2).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium">{record.userName}</span>
-                        <span className="text-xs text-muted-foreground">{record.userEmail}</span>
-                      </div>
+                      <span className="text-sm font-medium">{record.userName}</span>
                     </div>
                   </TableCell>
+                  <TableCell className="text-muted-foreground">{record.userEmail}</TableCell>
                   <TableCell className="flex items-center gap-2"><CalendarIcon className="w-3 h-3 text-muted-foreground" /> {record.date}</TableCell>
                   <TableCell>{record.clockIn}</TableCell>
                   <TableCell>{record.clockOut}</TableCell>
@@ -222,7 +221,7 @@ export default function AdminAttendance() {
                     <Badge variant="outline" className={record.status === 'present' ? "bg-success/10 text-success border-success/20" : "bg-warning/10 text-warning border-warning/20"}>{record.status}</Badge>
                   </TableCell>
                 </TableRow>
-              )) : <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">No attendance records found</TableCell></TableRow>}
+              )) : <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">No attendance records found</TableCell></TableRow>}
             </TableBody>
           </Table>
         </div>

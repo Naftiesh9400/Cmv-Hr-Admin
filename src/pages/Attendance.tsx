@@ -229,11 +229,9 @@ export default function Attendance() {
     document.body.removeChild(a);
   };
 
-  const getHolidayName = (date: Date) => {
+  const getHoliday = (date: Date) => {
     const dateStr = format(date, "yyyy-MM-dd");
-    const holiday = holidays.find(h => h.date === dateStr);
-    if (holiday) return holiday.name;
-    return null;
+    return holidays.find(h => h.date === dateStr);
   };
 
   const getDayStatus = (date: Date) => {
@@ -249,10 +247,10 @@ export default function Attendance() {
     let reason = "Absent";
     
     // Check for Holiday (Sunday or Special Day)
-    const holidayName = getHolidayName(date);
-    if (getDay(date) === 0 || holidayName) {
+    const holiday = getHoliday(date);
+    if (getDay(date) === 0 || holiday) {
       color = "bg-orange-100 text-orange-700 border-orange-200";
-      reason = holidayName || "Holiday";
+      reason = holiday ? holiday.name : "Holiday";
     }
 
     // Check Attendance
@@ -357,12 +355,16 @@ export default function Attendance() {
             {calendarDays.map((date, i) => {
               if (!date) return <div key={`pad-${i}`} className="h-24" />;
               const { color, reason } = getDayStatus(date);
+              const holiday = getHoliday(date);
               return (
                 <div 
                   key={date.toISOString()} 
                   className={`h-24 border rounded-lg p-2 flex flex-col justify-between transition-colors hover:opacity-80 cursor-pointer ${color}`} 
                   title={reason}
-                  onClick={() => reason && toast.info(reason)}
+                  onClick={() => {
+                    if (holiday) toast.info(`${holiday.name} (${holiday.type || 'Holiday'})`);
+                    else if (reason) toast.info(reason);
+                  }}
                 >
                   <span className={`text-sm font-medium ${isToday(date) ? 'bg-primary text-primary-foreground w-6 h-6 rounded-full flex items-center justify-center' : ''}`}>{format(date, 'd')}</span>
                   {reason && <span className="text-xs truncate font-medium">{reason}</span>}
